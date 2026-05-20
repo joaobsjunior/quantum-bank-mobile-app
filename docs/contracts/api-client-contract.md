@@ -2,12 +2,17 @@
 
 Requirement: CONT-02
 
+Additional requirement: GATE-01
+
 Owner: Quantum Bank Mobile App
 
 This contract defines how the Flutter mobile app consumes Quantum Bank APIs
 through the gateway.
 
 KrakenD is the only protected API origin.
+
+Phase 2 protected API configuration uses only
+`GATEWAY_BASE_URL=http://localhost:8080`.
 
 The app must not configure backend service hosts as protected API origins. All
 app-facing routes come from `api-gateway/openapi/quantum-bank-v1.yaml`.
@@ -40,6 +45,9 @@ The client must call:
 The app must not call backend implementation paths, internal service names,
 container network aliases, or backend ports.
 
+Forbidden protected API origin strings include `BACKEND_BASE_URL`, `backend:`,
+`localhost:8081`, and `http://backend`.
+
 ## Auth Bootstrap Calls
 
 `POST /auth/otk` requests a one-time token after authentication.
@@ -58,6 +66,15 @@ contract.
 
 The mobile client attaches the OAuth2 bearer token and uses the runtime client
 certificate when protected routes require mTLS.
+
+## Phase 2 Gateway Configuration
+
+The mobile app reads protected API calls from `GATEWAY_BASE_URL` only. The local
+example value is `GATEWAY_BASE_URL=http://localhost:8080`, matching the KrakenD
+OpenAPI server.
+
+Mobile runtime source and config must pass `scripts/verify-gateway-only.sh` so
+protected banking calls cannot bypass KrakenD.
 
 ## Pix Simulation Contract
 

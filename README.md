@@ -16,3 +16,11 @@ The mobile app owns and consumes these Phase 1 contracts:
 - [API Client Contract](docs/contracts/api-client-contract.md) for CONT-02 gateway-only API usage, client preconditions, Pix scenario submission, and problem-details parsing.
 
 Later mobile implementation must keep protected API calls pointed at KrakenD and must not introduce direct backend origins.
+
+## Phase 2 Gateway-Only Config
+
+Protected API calls use [config/api.env.example](config/api.env.example) with
+`GATEWAY_BASE_URL=http://localhost:8080`.
+
+Run [scripts/verify-gateway-only.sh](scripts/verify-gateway-only.sh) to check
+runtime source and config for forbidden backend origin strings.
