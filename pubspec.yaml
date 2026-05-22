@@ -1,0 +1,14 @@
+name: quantum_bank_mobile
+description: Quantum Bank mobile security bootstrap and gateway client package.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.11.0 <4.0.0"
+
+dependencies:
+  basic_utils: ^5.8.2
+  pointycastle: ^4.0.0
+
+dev_dependencies:
+  test: ^1.26.0
