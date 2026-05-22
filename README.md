@@ -40,3 +40,13 @@ fail-closed mTLS client setup.
   bootstrap and `GATEWAY_BASE_URL=https://localhost:8443` for protected banking.
 - `dart test` and `bash scripts/verify-gateway-only.sh` verify certificate-ready
   behavior and gateway-only config.
+
+## Phase 5 Flutter Screens
+
+The Flutter app now gates protected screens on authenticated and
+certificate-ready state, then exposes:
+
+- Pix success/error simulation screen.
+- Statement screen loaded through the gateway API abstraction.
+- Customer registration profile screen with `PUT /profile` editing via
+  `profile:write`.

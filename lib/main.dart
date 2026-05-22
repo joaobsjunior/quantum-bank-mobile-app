@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app/app_state.dart';
 import 'core/api/gateway_api.dart';
 import 'features/pix/pix_screen.dart';
+import 'features/profile/profile_screen.dart';
 import 'features/statements/statement_screen.dart';
 
 void main() {
@@ -122,7 +123,7 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
     final pages = <Widget>[
       PixScreen(api: widget.api),
       StatementScreen(api: widget.api),
-      const Center(child: Text('Perfil')),
+      ProfileScreen(api: widget.api),
     ];
 
     return Scaffold(
