@@ -1,5 +1,4 @@
 import 'package:basic_utils/basic_utils.dart';
-import 'package:pointycastle/export.dart';
 
 class CsrInput {
   const CsrInput({

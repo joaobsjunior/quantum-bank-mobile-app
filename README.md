@@ -20,7 +20,23 @@ Later mobile implementation must keep protected API calls pointed at KrakenD and
 ## Phase 2 Gateway-Only Config
 
 Protected API calls use [config/api.env.example](config/api.env.example) with
-`GATEWAY_BASE_URL=http://localhost:8080`.
+gateway-named origins only.
 
 Run [scripts/verify-gateway-only.sh](scripts/verify-gateway-only.sh) to check
 runtime source and config for forbidden backend origin strings.
+
+## Phase 3 Certificate-Ready Clients
+
+Phase 3 adds runtime key generation, CSR creation, certificate-ready state, and
+fail-closed mTLS client setup.
+
+- `lib/features/bootstrap/` creates runtime key material, builds CSR input, and
+  submits bootstrap requests through the gateway bootstrap listener.
+- `lib/core/tls/secure_context_factory.dart` builds `SecurityContext` with
+  explicit trust anchors and client certificate material.
+- `lib/core/api/banking_client.dart` requires certificate-ready state before
+  protected banking calls.
+- Local config now uses `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080` for
+  bootstrap and `GATEWAY_BASE_URL=https://localhost:8443` for protected banking.
+- `dart test` and `bash scripts/verify-gateway-only.sh` verify certificate-ready
+  behavior and gateway-only config.

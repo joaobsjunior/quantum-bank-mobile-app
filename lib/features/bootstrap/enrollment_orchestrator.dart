@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../core/tls/cert_state.dart';
 import 'csr_service.dart';
 import 'keypair_service.dart';
@@ -69,7 +71,8 @@ class EnrollmentOrchestrator {
     required String environment,
   }) async {
     try {
-      final keyPair = (_keypairService ?? KeypairService()).generateRsaKeyPair();
+      final keys = _keypairService ?? KeypairService();
+      final keyPair = keys.generateRsaKeyPair();
       final csrPem = (_csrService ?? CsrService()).generatePem(
         input: CsrInput(
           oauth2Subject: oauth2Subject,
@@ -100,7 +103,7 @@ class EnrollmentOrchestrator {
 
       return CertState.ready(
         certificateChainBytes: enrollmentResult.certificateChainBytes,
-        privateKeyBytes: keyPair.privateKey.privateExponent?.toByteArray() ?? const <int>[],
+        privateKeyBytes: utf8.encode(keys.encodePrivateKeyPem(keyPair.privateKey)),
         expiresAt: enrollmentResult.expiresAt,
         certificateProfile: certificateProfile,
         environment: environment,
@@ -115,21 +118,5 @@ class EnrollmentOrchestrator {
         _ => CertState.csrRejected(),
       };
     }
-  }
-}
-
-extension on BigInt {
-  List<int> toByteArray() {
-    if (this == BigInt.zero) {
-      return const <int>[0];
-    }
-
-    var value = this;
-    final bytes = <int>[];
-    while (value > BigInt.zero) {
-      bytes.insert(0, (value & BigInt.from(0xff)).toInt());
-      value = value >> 8;
-    }
-    return bytes;
   }
 }

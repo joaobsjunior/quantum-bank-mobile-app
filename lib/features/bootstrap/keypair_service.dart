@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:basic_utils/basic_utils.dart';
 import 'package:pointycastle/export.dart';
 
 class KeypairService {
@@ -17,8 +18,8 @@ class KeypairService {
 
     final keyPair = generator.generateKeyPair();
     return AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey>(
-      keyPair.publicKey as RSAPublicKey,
-      keyPair.privateKey as RSAPrivateKey,
+      keyPair.publicKey,
+      keyPair.privateKey,
     );
   }
 
@@ -31,4 +32,7 @@ class KeypairService {
 
     return FortunaRandom()..seed(KeyParameter(seed));
   }
+
+  String encodePrivateKeyPem(RSAPrivateKey privateKey) =>
+      CryptoUtils.encodeRSAPrivateKeyToPem(privateKey);
 }

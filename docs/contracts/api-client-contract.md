@@ -11,8 +11,12 @@ through the gateway.
 
 KrakenD is the only protected API origin.
 
-Phase 2 protected API configuration uses only
-`GATEWAY_BASE_URL=http://localhost:8080`.
+Phase 3 local configuration uses gateway-named origins only:
+
+- `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080` for OAuth2 bearer
+  bootstrap calls before certificate-ready state.
+- `GATEWAY_BASE_URL=https://localhost:8443` for certificate-ready protected
+  banking calls.
 
 The app must not configure backend service hosts as protected API origins. All
 app-facing routes come from `api-gateway/openapi/quantum-bank-v1.yaml`.
@@ -67,11 +71,15 @@ contract.
 The mobile client attaches the OAuth2 bearer token and uses the runtime client
 certificate when protected routes require mTLS.
 
-## Phase 2 Gateway Configuration
+## Phase 3 Gateway Configuration
 
-The mobile app reads protected API calls from `GATEWAY_BASE_URL` only. The local
-example value is `GATEWAY_BASE_URL=http://localhost:8080`, matching the KrakenD
-OpenAPI server.
+The mobile app reads protected banking calls from `GATEWAY_BASE_URL` only. The
+local example value is `GATEWAY_BASE_URL=https://localhost:8443`, matching the
+KrakenD mTLS listener.
+
+Bootstrap calls use `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080`, also a
+KrakenD listener, so bootstrap remains gateway-only before certificate-ready
+state exists.
 
 Mobile runtime source and config must pass `scripts/verify-gateway-only.sh` so
 protected banking calls cannot bypass KrakenD.
