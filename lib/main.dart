@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app/app_state.dart';
 import 'core/api/gateway_api.dart';
 import 'features/pix/pix_screen.dart';
+import 'features/statements/statement_screen.dart';
 
 void main() {
   runApp(QuantumBankApp(api: DemoGatewayBankingApi()));
@@ -120,7 +121,7 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
 
     final pages = <Widget>[
       PixScreen(api: widget.api),
-      const Center(child: Text('Extrato')),
+      StatementScreen(api: widget.api),
       const Center(child: Text('Perfil')),
     ];
 
