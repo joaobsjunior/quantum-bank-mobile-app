@@ -1,6 +1,6 @@
 # Client Bootstrap Contract
 
-Requirement: CONT-01
+Requirement: CONT-01, PKI-01
 
 Owner: Quantum Bank Mobile App
 
@@ -73,6 +73,27 @@ The submission includes:
 
 The app must treat the issued certificate as bound to the generated private key.
 
+## Phase 3 Runtime Implementation
+
+Phase 3 implements PKI-01 in `lib/features/bootstrap/` and `lib/core/tls/`.
+
+- D-16: Mobile generates the keypair at runtime; no static private keys or client certs are bundled.
+- D-17: Mobile uses Dart `dart:io` `HttpClient` and `SecurityContext` for the mTLS-capable client path.
+- D-18: Mobile fails closed and never uses `badCertificateCallback` to accept all certificates.
+- D-19: Mobile models key, certificate chain, and lifecycle metadata as one certificate-ready state without logging or exporting private key material.
+- D-20: Protected banking calls remain gateway-only and use `GATEWAY_BASE_URL`; no backend or PKI origin is added to mobile protected config.
+- D-21: Mobile models missing, expired, untrusted, CSR rejected, OTK expired, and OTK replayed states.
+
+Implemented state names:
+
+- `missing`
+- `ready`
+- `expired`
+- `untrusted`
+- `csrRejected`
+- `otkExpired`
+- `otkReplayed`
+
 ## Certificate Storage Assumptions
 
 The mobile app stores the issued client certificate and its lifecycle metadata
@@ -101,12 +122,12 @@ certificate is available for mTLS when protected API endpoints require it.
 
 The mobile app must represent these bootstrap failure states:
 
-- `otk_expired`: OTK TTL elapsed before CSR submission completed.
-- `otk_replayed`: OTK was already used or reached a terminal state.
-- `csr_rejected`: backend or PKI rejected the CSR.
-- `certificate_untrusted`: certificate chain or trust anchor is not accepted.
-- `certificate_missing`: protected API access was attempted without a usable
-  client certificate.
+- `otkExpired`: OTK TTL elapsed before CSR submission completed.
+- `otkReplayed`: OTK was already used or reached a terminal state.
+- `csrRejected`: backend or PKI rejected the CSR.
+- `untrusted`: certificate chain or trust anchor is not accepted.
+- `missing`: protected API access was attempted without a usable client certificate.
+- `expired`: certificate metadata says the certificate is no longer usable.
 
 Failure states must preserve enough detail for troubleshooting while avoiding
 token values, private key material, and sensitive CSR internals in UI text or
