@@ -2,10 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-enum PixScenario {
-  success,
-  error,
-}
+enum PixScenario { success, error }
 
 @immutable
 class PixResult {
@@ -79,14 +76,13 @@ class CustomerProfile {
     String? email,
     String? phone,
     String? address,
-  }) =>
-      CustomerProfile(
-        fullName: fullName ?? this.fullName,
-        email: email ?? this.email,
-        phone: phone ?? this.phone,
-        documentNumber: documentNumber,
-        address: address ?? this.address,
-      );
+  }) => CustomerProfile(
+    fullName: fullName ?? this.fullName,
+    email: email ?? this.email,
+    phone: phone ?? this.phone,
+    documentNumber: documentNumber,
+    address: address ?? this.address,
+  );
 }
 
 abstract interface class GatewayBankingApi {
@@ -125,7 +121,8 @@ class DemoGatewayBankingApi implements GatewayBankingApi {
         GatewayProblem(
           errorCode: 'pix_simulated_error',
           title: 'Pix simulation failed',
-          detail: 'Pix transfer was rejected by the selected local simulation scenario.',
+          detail:
+              'Pix transfer was rejected by the selected local simulation scenario.',
           correlationId: _correlationId(),
         ),
       );
@@ -141,19 +138,19 @@ class DemoGatewayBankingApi implements GatewayBankingApi {
 
   @override
   Future<List<StatementItem>> loadStatements() async => [
-        StatementItem(
-          description: 'Pix recebido - Cafeteria Horizonte',
-          amount: 125.50,
-          type: 'CREDIT',
-          postedAt: DateTime.utc(2026, 5, 20, 9, 30),
-        ),
-        StatementItem(
-          description: 'Pix enviado - Mercado Central',
-          amount: -42.90,
-          type: 'DEBIT',
-          postedAt: DateTime.utc(2026, 5, 21, 14, 15),
-        ),
-      ];
+    StatementItem(
+      description: 'Pix recebido - Cafeteria Horizonte',
+      amount: 125.50,
+      type: 'CREDIT',
+      postedAt: DateTime.utc(2026, 5, 20, 9, 30),
+    ),
+    StatementItem(
+      description: 'Pix enviado - Mercado Central',
+      amount: -42.90,
+      type: 'DEBIT',
+      postedAt: DateTime.utc(2026, 5, 21, 14, 15),
+    ),
+  ];
 
   @override
   Future<CustomerProfile> loadProfile() async => _profile;

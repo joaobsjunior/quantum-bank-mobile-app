@@ -21,8 +21,17 @@ void main() {
     expect(input.deviceId, equals('device-local-001'));
     expect(input.certificateProfile, equals('quantum-bank-mobile-client-v1'));
     expect(input.environment, equals('local'));
-    expect(input.subjectAlternativeNames, contains('urn:quantum-bank:app-instance:app-local-001'));
-    expect(input.subjectAlternativeNames, contains('urn:quantum-bank:device:device-local-001'));
-    expect(input.subjectAlternativeNames, contains('urn:quantum-bank:environment:local'));
+    expect(
+      input.subjectAlternativeNames,
+      contains('urn:quantum-bank:app-instance:app-local-001'),
+    );
+    expect(
+      input.subjectAlternativeNames,
+      contains('urn:quantum-bank:device:device-local-001'),
+    );
+    expect(
+      input.subjectAlternativeNames,
+      contains('urn:quantum-bank:environment:local'),
+    );
   });
 }

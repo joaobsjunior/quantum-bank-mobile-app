@@ -22,7 +22,9 @@ class SecureContextFactory {
         ..usePrivateKeyBytes(privateKeyBytes);
       return context;
     } catch (_) {
-      throw const TlsConfigurationException('invalid mTLS certificate material');
+      throw const TlsConfigurationException(
+        'invalid mTLS certificate material',
+      );
     }
   }
 }

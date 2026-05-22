@@ -13,8 +13,12 @@ class PixScreen extends StatefulWidget {
 
 class _PixScreenState extends State<PixScreen> {
   final amountController = TextEditingController(text: '25.30');
-  final recipientController = TextEditingController(text: 'recipient@example.com');
-  final descriptionController = TextEditingController(text: 'Transferencia local');
+  final recipientController = TextEditingController(
+    text: 'recipient@example.com',
+  );
+  final descriptionController = TextEditingController(
+    text: 'Transferencia local',
+  );
   PixScenario scenario = PixScenario.success;
   PixResult? result;
   GatewayProblem? problem;
@@ -61,27 +65,45 @@ class _PixScreenState extends State<PixScreen> {
         const SizedBox(height: 16),
         TextField(
           controller: amountController,
-          decoration: const InputDecoration(labelText: 'Valor', prefixIcon: Icon(Icons.attach_money)),
+          decoration: const InputDecoration(
+            labelText: 'Valor',
+            prefixIcon: Icon(Icons.attach_money),
+          ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: recipientController,
-          decoration: const InputDecoration(labelText: 'Chave Pix', prefixIcon: Icon(Icons.alternate_email)),
+          decoration: const InputDecoration(
+            labelText: 'Chave Pix',
+            prefixIcon: Icon(Icons.alternate_email),
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: descriptionController,
-          decoration: const InputDecoration(labelText: 'Descricao', prefixIcon: Icon(Icons.notes_outlined)),
+          decoration: const InputDecoration(
+            labelText: 'Descricao',
+            prefixIcon: Icon(Icons.notes_outlined),
+          ),
         ),
         const SizedBox(height: 16),
         SegmentedButton<PixScenario>(
           segments: const [
-            ButtonSegment(value: PixScenario.success, label: Text('SUCCESS'), icon: Icon(Icons.check_circle_outline)),
-            ButtonSegment(value: PixScenario.error, label: Text('ERROR'), icon: Icon(Icons.error_outline)),
+            ButtonSegment(
+              value: PixScenario.success,
+              label: Text('SUCCESS'),
+              icon: Icon(Icons.check_circle_outline),
+            ),
+            ButtonSegment(
+              value: PixScenario.error,
+              label: Text('ERROR'),
+              icon: Icon(Icons.error_outline),
+            ),
           ],
           selected: {scenario},
-          onSelectionChanged: (value) => setState(() => scenario = value.single),
+          onSelectionChanged: (value) =>
+              setState(() => scenario = value.single),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
@@ -94,7 +116,9 @@ class _PixScreenState extends State<PixScreen> {
           ListTile(
             leading: const Icon(Icons.verified_outlined),
             title: Text(result!.status),
-            subtitle: Text('${result!.transactionId} - ${result!.correlationId}'),
+            subtitle: Text(
+              '${result!.transactionId} - ${result!.correlationId}',
+            ),
           ),
         if (problem != null)
           ListTile(

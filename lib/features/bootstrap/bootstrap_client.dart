@@ -6,11 +6,22 @@ import 'enrollment_orchestrator.dart';
 class BootstrapClient implements BootstrapGateway {
   BootstrapClient({
     required this.baseUrl,
+    List<int>? trustedCaBytes,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _httpClient = httpClient ?? _buildHttpClient(trustedCaBytes);
 
   final Uri baseUrl;
   final HttpClient _httpClient;
+
+  static HttpClient _buildHttpClient(List<int>? trustedCaBytes) {
+    if (trustedCaBytes == null) {
+      return HttpClient();
+    }
+
+    final context = SecurityContext(withTrustedRoots: false)
+      ..setTrustedCertificatesBytes(trustedCaBytes);
+    return HttpClient(context: context);
+  }
 
   @override
   Future<OtkIssueResult> issueOtk({
@@ -58,9 +69,10 @@ class BootstrapClient implements BootstrapGateway {
       },
     );
 
-    final chain = (response['certificateChain'] as List<dynamic>? ?? <dynamic>[
-      response['certificate'] as String,
-    ]).cast<String>();
+    final chain =
+        (response['certificateChain'] as List<dynamic>? ??
+                <dynamic>[response['certificate'] as String])
+            .cast<String>();
 
     return CertificateEnrollmentResult(
       certificateChainBytes: utf8.encode(chain.join('\n')),
@@ -86,7 +98,9 @@ class BootstrapClient implements BootstrapGateway {
         : jsonDecode(responseBody) as Map<String, dynamic>;
 
     if (response.statusCode >= 400) {
-      throw BootstrapProblem(decoded['errorCode'] as String? ?? 'bootstrap_failed');
+      throw BootstrapProblem(
+        decoded['errorCode'] as String? ?? 'bootstrap_failed',
+      );
     }
 
     return decoded;

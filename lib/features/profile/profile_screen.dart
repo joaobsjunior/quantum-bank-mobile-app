@@ -79,26 +79,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Text('Perfil', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
-        Text('Customer registration data', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Customer registration data',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 16),
         TextField(
           controller: fullNameController,
-          decoration: const InputDecoration(labelText: 'Nome', prefixIcon: Icon(Icons.person_outline)),
+          decoration: const InputDecoration(
+            labelText: 'Nome',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: emailController,
-          decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
+          decoration: const InputDecoration(
+            labelText: 'Email',
+            prefixIcon: Icon(Icons.email_outlined),
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: phoneController,
-          decoration: const InputDecoration(labelText: 'Telefone', prefixIcon: Icon(Icons.phone_outlined)),
+          decoration: const InputDecoration(
+            labelText: 'Telefone',
+            prefixIcon: Icon(Icons.phone_outlined),
+          ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: addressController,
-          decoration: const InputDecoration(labelText: 'Endereco', prefixIcon: Icon(Icons.home_outlined)),
+          decoration: const InputDecoration(
+            labelText: 'Endereco',
+            prefixIcon: Icon(Icons.home_outlined),
+          ),
         ),
         const SizedBox(height: 12),
         ListTile(

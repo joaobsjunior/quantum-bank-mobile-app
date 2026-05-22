@@ -5,7 +5,11 @@ import 'package:quantum_bank_mobile/features/pix/pix_screen.dart';
 
 void main() {
   testWidgets('submits Pix SUCCESS scenario', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: PixScreen(api: DemoGatewayBankingApi()))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: PixScreen(api: DemoGatewayBankingApi())),
+      ),
+    );
 
     await tester.tap(find.text('Enviar Pix'));
     await tester.pumpAndSettle();
@@ -13,8 +17,14 @@ void main() {
     expect(find.text('COMPLETED'), findsOneWidget);
   });
 
-  testWidgets('submits Pix ERROR scenario and shows structured problem', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: PixScreen(api: DemoGatewayBankingApi()))));
+  testWidgets('submits Pix ERROR scenario and shows structured problem', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: PixScreen(api: DemoGatewayBankingApi())),
+      ),
+    );
 
     await tester.tap(find.text('ERROR'));
     await tester.pump();

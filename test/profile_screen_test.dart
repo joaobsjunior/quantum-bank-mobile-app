@@ -5,7 +5,11 @@ import 'package:quantum_bank_mobile/features/profile/profile_screen.dart';
 
 void main() {
   testWidgets('loads and edits customer registration profile', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ProfileScreen(api: DemoGatewayBankingApi()))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: ProfileScreen(api: DemoGatewayBankingApi())),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Customer registration data'), findsOneWidget);

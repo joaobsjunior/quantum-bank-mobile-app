@@ -5,7 +5,11 @@ import 'package:quantum_bank_mobile/features/statements/statement_screen.dart';
 
 void main() {
   testWidgets('renders statement entries from gateway API', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StatementScreen(api: DemoGatewayBankingApi()))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: StatementScreen(api: DemoGatewayBankingApi())),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Extrato'), findsOneWidget);

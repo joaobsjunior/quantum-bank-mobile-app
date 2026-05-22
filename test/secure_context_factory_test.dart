@@ -17,13 +17,18 @@ void main() {
     );
   });
 
-  test('source uses explicit trust and never exposes badCertificateCallback', () {
-    final source = File('lib/core/tls/secure_context_factory.dart').readAsStringSync();
+  test(
+    'source uses explicit trust and never exposes badCertificateCallback',
+    () {
+      final source = File(
+        'lib/core/tls/secure_context_factory.dart',
+      ).readAsStringSync();
 
-    expect(source, contains('SecurityContext(withTrustedRoots: false)'));
-    expect(source, contains('setTrustedCertificatesBytes'));
-    expect(source, contains('useCertificateChainBytes'));
-    expect(source, contains('usePrivateKeyBytes'));
-    expect(source, isNot(contains('badCertificateCallback')));
-  });
+      expect(source, contains('SecurityContext(withTrustedRoots: false)'));
+      expect(source, contains('setTrustedCertificatesBytes'));
+      expect(source, contains('useCertificateChainBytes'));
+      expect(source, contains('usePrivateKeyBytes'));
+      expect(source, isNot(contains('badCertificateCallback')));
+    },
+  );
 }

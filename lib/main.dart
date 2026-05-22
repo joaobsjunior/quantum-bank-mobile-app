@@ -1,31 +1,64 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app/app_state.dart';
+import 'core/api/banking_client.dart';
 import 'core/api/gateway_api.dart';
+import 'core/api/live_gateway_banking_api.dart';
+import 'core/config/runtime_config.dart';
+import 'features/auth/keycloak_auth_client.dart';
+import 'features/bootstrap/bootstrap_client.dart';
+import 'features/bootstrap/enrollment_orchestrator.dart';
 import 'features/pix/pix_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/statements/statement_screen.dart';
 
-void main() {
-  runApp(QuantumBankApp(api: DemoGatewayBankingApi()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final config = RuntimeConfig.fromEnvironment();
+  final trustedCaBytes = (await rootBundle.load(
+    config.trustedCaAsset,
+  )).buffer.asUint8List().toList(growable: false);
+  final appState = QuantumBankAppState(
+    authenticator: KeycloakAuthClient(
+      tokenUrl: config.keycloakTokenUrl,
+      clientId: config.keycloakClientId,
+      clientSecret: config.keycloakClientSecret,
+      username: config.localUsername,
+      password: config.localPassword,
+    ),
+    certificateEnrollment: EnrollmentOrchestrator(
+      bootstrapGateway: BootstrapClient(
+        baseUrl: config.gatewayBootstrapBaseUrl,
+        trustedCaBytes: trustedCaBytes,
+      ),
+    ),
+    runtimeConfig: config,
+  );
+  final api = LiveGatewayBankingApi(
+    bankingClient: BankingClient(
+      gatewayBaseUrl: config.gatewayBaseUrl,
+      trustedCaBytes: trustedCaBytes,
+    ),
+    authSessionProvider: () => appState.authSession,
+    certStateProvider: () => appState.certificateState,
+  );
+
+  runApp(QuantumBankApp(api: api, appState: appState));
 }
 
 class QuantumBankApp extends StatefulWidget {
-  const QuantumBankApp({
-    required this.api,
-    QuantumBankAppState? appState,
-    super.key,
-  }) : appState = appState ?? null;
+  const QuantumBankApp({required this.api, required this.appState, super.key});
 
   final GatewayBankingApi api;
-  final QuantumBankAppState? appState;
+  final QuantumBankAppState appState;
 
   @override
   State<QuantumBankApp> createState() => _QuantumBankAppState();
 }
 
 class _QuantumBankAppState extends State<QuantumBankApp> {
-  late final QuantumBankAppState appState = widget.appState ?? QuantumBankAppState();
+  late final QuantumBankAppState appState = widget.appState;
 
   @override
   void initState() {
@@ -56,11 +89,7 @@ class _QuantumBankAppState extends State<QuantumBankApp> {
 }
 
 class QuantumBankHome extends StatefulWidget {
-  const QuantumBankHome({
-    required this.appState,
-    required this.api,
-    super.key,
-  });
+  const QuantumBankHome({required this.appState, required this.api, super.key});
 
   final QuantumBankAppState appState;
   final GatewayBankingApi api;
@@ -102,16 +131,40 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: widget.appState.authenticate,
+                    onPressed: widget.appState.authenticating
+                        ? null
+                        : () => widget.appState.authenticate(),
                     icon: const Icon(Icons.verified_user_outlined),
-                    label: const Text('Autenticar'),
+                    label: Text(
+                      widget.appState.authenticating
+                          ? 'Autenticando...'
+                          : 'Autenticar',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: widget.appState.authenticated ? widget.appState.markCertificateReady : null,
+                    onPressed:
+                        widget.appState.authenticated &&
+                            !widget.appState.enrollingCertificate
+                        ? () => widget.appState.markCertificateReady()
+                        : null,
                     icon: const Icon(Icons.badge_outlined),
-                    label: const Text('Ativar certificado'),
+                    label: Text(
+                      widget.appState.enrollingCertificate
+                          ? 'Ativando...'
+                          : 'Ativar certificado',
+                    ),
                   ),
+                  if (widget.appState.lastError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.appState.lastError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -133,9 +186,18 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) => setState(() => selectedIndex = index),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.payments_outlined), label: 'Pix'),
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Extrato'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Perfil'),
+          NavigationDestination(
+            icon: Icon(Icons.payments_outlined),
+            label: 'Pix',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            label: 'Extrato',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            label: 'Perfil',
+          ),
         ],
       ),
     );

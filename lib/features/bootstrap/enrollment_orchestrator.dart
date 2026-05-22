@@ -23,11 +23,19 @@ abstract interface class BootstrapGateway {
   });
 }
 
-class OtkIssueResult {
-  const OtkIssueResult({
-    required this.otk,
-    required this.expiresAt,
+abstract interface class CertificateEnrollment {
+  Future<CertState> enroll({
+    required String bearerToken,
+    required String oauth2Subject,
+    required String appInstanceId,
+    required String deviceId,
+    required String certificateProfile,
+    required String environment,
   });
+}
+
+class OtkIssueResult {
+  const OtkIssueResult({required this.otk, required this.expiresAt});
 
   final String otk;
   final DateTime expiresAt;
@@ -49,14 +57,14 @@ class BootstrapProblem implements Exception {
   final String errorCode;
 }
 
-class EnrollmentOrchestrator {
+class EnrollmentOrchestrator implements CertificateEnrollment {
   const EnrollmentOrchestrator({
     required BootstrapGateway bootstrapGateway,
     KeypairService? keypairService,
     CsrService? csrService,
-  })  : _bootstrapGateway = bootstrapGateway,
-        _keypairService = keypairService,
-        _csrService = csrService;
+  }) : _bootstrapGateway = bootstrapGateway,
+       _keypairService = keypairService,
+       _csrService = csrService;
 
   final BootstrapGateway _bootstrapGateway;
   final KeypairService? _keypairService;
@@ -103,7 +111,9 @@ class EnrollmentOrchestrator {
 
       return CertState.ready(
         certificateChainBytes: enrollmentResult.certificateChainBytes,
-        privateKeyBytes: utf8.encode(keys.encodePrivateKeyPem(keyPair.privateKey)),
+        privateKeyBytes: utf8.encode(
+          keys.encodePrivateKeyPem(keyPair.privateKey),
+        ),
         expiresAt: enrollmentResult.expiresAt,
         certificateProfile: certificateProfile,
         environment: environment,
@@ -114,7 +124,9 @@ class EnrollmentOrchestrator {
       return switch (problem.errorCode) {
         'otk_expired' => CertState.otkExpired(),
         'otk_replayed' => CertState.otkReplayed(),
-        'csr_invalid' || 'private_key_rejected' || 'certificate_profile_mismatch' => CertState.csrRejected(),
+        'csr_invalid' ||
+        'private_key_rejected' ||
+        'certificate_profile_mismatch' => CertState.csrRejected(),
         _ => CertState.csrRejected(),
       };
     }

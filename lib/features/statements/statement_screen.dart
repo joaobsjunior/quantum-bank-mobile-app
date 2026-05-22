@@ -22,7 +22,9 @@ class StatementScreen extends StatelessWidget {
             else
               for (final entry in snapshot.data!)
                 ListTile(
-                  leading: Icon(entry.amount >= 0 ? Icons.south_west : Icons.north_east),
+                  leading: Icon(
+                    entry.amount >= 0 ? Icons.south_west : Icons.north_east,
+                  ),
                   title: Text(entry.description),
                   subtitle: Text(entry.type),
                   trailing: Text(entry.amount.toStringAsFixed(2)),
