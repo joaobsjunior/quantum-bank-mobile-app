@@ -79,12 +79,29 @@ void main() {
           'scenario': 'SUCCESS',
         },
       );
+      final updatedStatements = await banking.getStatements(
+        bearerToken: session.accessToken,
+        certState: enrollment,
+      );
 
       expect(statements['entries'], isA<List<dynamic>>());
       expect(statements['entries'] as List<dynamic>, isNotEmpty);
       expect(profile['fullName'], equals('Alice Quantum'));
       expect(updatedProfile['fullName'], equals('Alice Quantum Live Test'));
       expect(pix['status'], equals('COMPLETED'));
+      expect(
+        updatedStatements['entries'],
+        contains(
+          isA<Map<String, dynamic>>()
+              .having(
+                (entry) => entry['description'],
+                'description',
+                'Flutter live runtime test',
+              )
+              .having((entry) => entry['amount'], 'amount', -25.3)
+              .having((entry) => entry['type'], 'type', 'DEBIT'),
+        ),
+      );
     },
   );
 }
