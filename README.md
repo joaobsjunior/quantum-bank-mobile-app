@@ -50,3 +50,12 @@ certificate-ready state, then exposes:
 - Statement screen loaded through the gateway API abstraction.
 - Customer registration profile screen with `PUT /profile` editing via
   `profile:write`.
+
+## Testing & CI
+
+- Run tests with coverage: `flutter test --coverage` (emits
+  `coverage/lcov.info`).
+- Enforce the coverage gate: `./scripts/check-coverage.sh 100 coverage/lcov.info`
+  fails when line coverage is below **100%**.
+- CI (`.github/workflows/ci.yml`) sets up Flutter 3.41, runs `flutter analyze`,
+  tests with coverage, and enforces the 100% gate on every push/PR to `main`.

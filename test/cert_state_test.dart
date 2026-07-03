@@ -31,4 +31,26 @@ void main() {
     expect(state.appInstanceId, equals('app-local-001'));
     expect(state.deviceId, equals('device-local-001'));
   });
+
+  test('non-ready states expose null metadata and are never ready', () {
+    final states = [
+      CertState.missing(),
+      CertState.expired(),
+      CertState.untrusted(),
+      CertState.csrRejected(),
+      CertState.otkExpired(),
+      CertState.otkReplayed(),
+    ];
+
+    for (final state in states) {
+      expect(state.certificateChainBytes, isNull);
+      expect(state.privateKeyBytes, isNull);
+      expect(state.expiresAt, isNull);
+      expect(state.certificateProfile, isNull);
+      expect(state.environment, isNull);
+      expect(state.appInstanceId, isNull);
+      expect(state.deviceId, isNull);
+      expect(state.isReadyAt(DateTime.now().toUtc()), isFalse);
+    }
+  });
 }
