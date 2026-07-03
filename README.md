@@ -62,17 +62,22 @@ certificate-ready state, then exposes:
 
 ## Runtime Requirements
 
-The mobile app is a Flutter client and is **not** part of `compose.yaml`; it runs
-on a developer machine, emulator, or device against the local gateway stack.
+The mobile app is a Flutter client — it is **not** part of `docker-compose`. It
+runs from a developer machine against the local gateway stack.
 
-| Resource | Footprint |
+### Recommended developer setup
+
+| Resource | Recommended |
 | --- | --- |
-| Toolchain | Flutter 3.41 / Dart `>=3.11.0 <4.0.0` (~2–3 GB installed) |
-| Memory | Android emulator ~2–4 GB, or a physical device / iOS Simulator; on-device runtime is light |
-| CPU | 2+ vCPU for builds and the emulator |
-| Storage | ~2–3 GB SDK + pub/build cache, plus per-build artifacts |
+| Toolchain | **Flutter 3.41 / Dart ≥ 3.11** |
+| Memory | **8 GB** machine (the Android emulator alone uses 2–4 GB) |
+| CPU | **4 vCPU** for smooth builds and the emulator |
+| Disk | **~5 GB** (Flutter SDK + Android SDK/emulator + build cache) |
 
-- Needs the Android SDK/emulator (or macOS + Xcode for iOS) in addition to the
+### Good to know
+
+- Needs the Android SDK/emulator, or macOS + Xcode for iOS, in addition to the
   Flutter SDK.
-- Point the app at the local gateway: `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080`
-  and `GATEWAY_BASE_URL=https://localhost:8443` (see Phase 3 config).
+- Point the app at the local gateway:
+  `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080` (bootstrap) and
+  `GATEWAY_BASE_URL=https://localhost:8443` (protected banking).
