@@ -40,8 +40,10 @@ Future<void> main() async {
       gatewayBaseUrl: config.gatewayBaseUrl,
       trustedCaBytes: trustedCaBytes,
     ),
-    authSessionProvider: () => appState.authSession,
-    certStateProvider: () => appState.certificateState,
+    // Provider closures are exercised by the live gateway path (e2e job),
+    // not by unit tests, which never drive a real banking call through main().
+    authSessionProvider: () => appState.authSession, // coverage:ignore-line
+    certStateProvider: () => appState.certificateState, // coverage:ignore-line
   );
 
   runApp(QuantumBankApp(api: api, appState: appState));

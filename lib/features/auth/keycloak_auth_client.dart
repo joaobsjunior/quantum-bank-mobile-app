@@ -35,7 +35,9 @@ class KeycloakAuthClient implements Authenticator {
       }
     }
 
-    throw AuthException(statusCode: 0, message: lastError.toString());
+    // Unreachable: the loop always returns or rethrows on the final attempt;
+    // this only satisfies the non-nullable return type.
+    throw AuthException(statusCode: 0, message: lastError.toString()); // coverage:ignore-line
   }
 
   Future<AuthSession> _authenticateOnce() async {
