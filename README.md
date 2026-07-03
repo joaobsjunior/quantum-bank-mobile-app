@@ -59,3 +59,20 @@ certificate-ready state, then exposes:
   fails when line coverage is below **100%**.
 - CI (`.github/workflows/ci.yml`) sets up Flutter 3.41, runs `flutter analyze`,
   tests with coverage, and enforces the 100% gate on every push/PR to `main`.
+
+## Runtime Requirements
+
+The mobile app is a Flutter client and is **not** part of `compose.yaml`; it runs
+on a developer machine, emulator, or device against the local gateway stack.
+
+| Resource | Footprint |
+| --- | --- |
+| Toolchain | Flutter 3.41 / Dart `>=3.11.0 <4.0.0` (~2–3 GB installed) |
+| Memory | Android emulator ~2–4 GB, or a physical device / iOS Simulator; on-device runtime is light |
+| CPU | 2+ vCPU for builds and the emulator |
+| Storage | ~2–3 GB SDK + pub/build cache, plus per-build artifacts |
+
+- Needs the Android SDK/emulator (or macOS + Xcode for iOS) in addition to the
+  Flutter SDK.
+- Point the app at the local gateway: `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080`
+  and `GATEWAY_BASE_URL=https://localhost:8443` (see Phase 3 config).
