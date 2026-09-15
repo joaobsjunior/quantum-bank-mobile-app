@@ -10,8 +10,21 @@ class KeycloakAuthClient implements Authenticator {
     required this.username,
     required this.password,
     this.clientSecret = '',
+    List<int>? trustedCaBytes,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+  }) : _httpClient = httpClient ?? _buildHttpClient(trustedCaBytes);
+
+  /// Trusts only the bundled local CA when one is provided, so the issuer's
+  /// PKI-issued certificate is verified and no system root can impersonate it.
+  static HttpClient _buildHttpClient(List<int>? trustedCaBytes) {
+    if (trustedCaBytes == null) {
+      return HttpClient();
+    }
+
+    final context = SecurityContext(withTrustedRoots: false)
+      ..setTrustedCertificatesBytes(trustedCaBytes);
+    return HttpClient(context: context);
+  }
 
   final Uri tokenUrl;
   final String clientId;
@@ -22,6 +35,10 @@ class KeycloakAuthClient implements Authenticator {
 
   @override
   Future<AuthSession> authenticate() async {
+    if (username.isEmpty || password.isEmpty) {
+      throw const AuthException(statusCode: 0, message: 'missing_credentials');
+    }
+
     Object? lastError;
     for (var attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -80,11 +97,10 @@ class KeycloakAuthClient implements Authenticator {
       throw const AuthException(statusCode: 0, message: 'missing_access_token');
     }
 
+    // The backend binds OTKs, CSR subjects and banking data to `sub` only, so
+    // the app never falls back to a username or client id.
     final tokenPayload = _decodeJwtPayload(accessToken);
-    final subject =
-        tokenPayload['sub'] as String? ??
-        tokenPayload['preferred_username'] as String? ??
-        tokenPayload['azp'] as String?;
+    final subject = tokenPayload['sub'] as String?;
     if (subject == null || subject.isEmpty) {
       throw const AuthException(
         statusCode: 0,

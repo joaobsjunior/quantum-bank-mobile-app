@@ -1,5 +1,16 @@
+/// Thrown when the runtime configuration would weaken the secure path (for
+/// example a plaintext issuer or gateway origin).
+class InsecureRuntimeConfigException implements Exception {
+  const InsecureRuntimeConfigException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'InsecureRuntimeConfigException: $message';
+}
+
 class RuntimeConfig {
-  const RuntimeConfig({
+  RuntimeConfig({
     required this.keycloakTokenUrl,
     required this.keycloakClientId,
     required this.keycloakClientSecret,
@@ -12,7 +23,17 @@ class RuntimeConfig {
     required this.deviceId,
     required this.certificateProfile,
     required this.environment,
-  });
+  }) {
+    // Fail closed: credentials, tokens and certificates only ever travel over
+    // TLS verified against the bundled trust anchor.
+    for (final origin in [keycloakTokenUrl, gatewayBootstrapBaseUrl, gatewayBaseUrl]) {
+      if (origin.scheme != 'https') {
+        throw InsecureRuntimeConfigException(
+          'origin must use https, got $origin',
+        );
+      }
+    }
+  }
 
   final Uri keycloakTokenUrl;
   final String keycloakClientId;
@@ -32,7 +53,7 @@ class RuntimeConfig {
       const String.fromEnvironment(
         'KEYCLOAK_TOKEN_URL',
         defaultValue:
-            'http://localhost:8180/realms/quantum-bank-local/protocol/openid-connect/token',
+            'https://localhost:8180/realms/quantum-bank-local/protocol/openid-connect/token',
       ),
     ),
     keycloakClientId: const String.fromEnvironment(
@@ -46,10 +67,9 @@ class RuntimeConfig {
       'KEYCLOAK_USERNAME',
       defaultValue: 'alice@quantumbank.local',
     ),
-    localPassword: const String.fromEnvironment(
-      'KEYCLOAK_PASSWORD',
-      defaultValue: 'change-me-local-only',
-    ),
+    // No default on purpose: a password must never be compiled into the
+    // binary. Supply it with --dart-define=KEYCLOAK_PASSWORD=... for local runs.
+    localPassword: const String.fromEnvironment('KEYCLOAK_PASSWORD'),
     gatewayBootstrapBaseUrl: Uri.parse(
       const String.fromEnvironment(
         'GATEWAY_BOOTSTRAP_BASE_URL',
@@ -89,7 +109,7 @@ class RuntimeConfig {
     String keycloakClientId = 'quantum-bank-mobile',
     String keycloakClientSecret = '',
     String localUsername = 'alice@quantumbank.local',
-    String localPassword = 'change-me-local-only',
+    String localPassword = '',
     Uri? gatewayBootstrapBaseUrl,
     Uri? gatewayBaseUrl,
     String trustedCaAsset = 'assets/local-ca/root-ca.crt',
@@ -101,7 +121,7 @@ class RuntimeConfig {
     keycloakTokenUrl:
         keycloakTokenUrl ??
         Uri.parse(
-          'http://localhost:8180/realms/quantum-bank-local/protocol/openid-connect/token',
+          'https://localhost:8180/realms/quantum-bank-local/protocol/openid-connect/token',
         ),
     keycloakClientId: keycloakClientId,
     keycloakClientSecret: keycloakClientSecret,

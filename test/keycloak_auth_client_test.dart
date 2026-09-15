@@ -68,7 +68,7 @@ void main() {
     expect(capturedBody, contains('client_secret=top-secret'));
   });
 
-  test('falls back to preferred_username, azp and payload scope', () async {
+  test('never falls back to preferred_username or azp for the subject', () async {
     final server = await serve(
       (request) => respondJson(request, 200, {
         'access_token': jwtWith({
@@ -80,10 +80,66 @@ void main() {
     );
     addTearDown(() => server.close(force: true));
 
+    await expectLater(
+      clientFor(server).authenticate(),
+      throwsA(isA<AuthException>().having((e) => e.message, 'message', 'missing_token_subject')),
+    );
+  });
+
+  test('uses the payload scope when the token response has none', () async {
+    final server = await serve(
+      (request) => respondJson(request, 200, {
+        'access_token': jwtWith({'sub': 'bob', 'scope': 'statements:read'}),
+      }),
+    );
+    addTearDown(() => server.close(force: true));
+
     final session = await clientFor(server).authenticate();
 
     expect(session.subject, equals('bob'));
     expect(session.scopes, equals(['statements:read']));
+  });
+
+  test('refuses to authenticate without credentials', () async {
+    final client = KeycloakAuthClient(
+      tokenUrl: Uri.parse('https://localhost:8180/token'),
+      clientId: 'quantum-bank-mobile',
+      username: 'alice@quantumbank.local',
+      password: '',
+    );
+
+    await expectLater(
+      client.authenticate(),
+      throwsA(isA<AuthException>().having((e) => e.message, 'message', 'missing_credentials')),
+    );
+  });
+
+  test('builds a pinned TLS client when a trust anchor is supplied', () async {
+    final server = await serve(
+      (request) => respondJson(request, 200, {
+        'access_token': jwtWith({'sub': 'alice'}),
+        'expires_in': 60,
+      }),
+    );
+    addTearDown(() => server.close(force: true));
+    final rootCa = await File('assets/local-ca/root-ca.crt').readAsBytes();
+
+    final pinned = KeycloakAuthClient(
+      tokenUrl: Uri.parse('http://127.0.0.1:${server.port}/token'),
+      clientId: 'quantum-bank-mobile',
+      username: 'alice@quantumbank.local',
+      password: 'change-me-local-only',
+      trustedCaBytes: rootCa,
+    );
+    final system = KeycloakAuthClient(
+      tokenUrl: Uri.parse('http://127.0.0.1:${server.port}/token'),
+      clientId: 'quantum-bank-mobile',
+      username: 'alice@quantumbank.local',
+      password: 'change-me-local-only',
+    );
+
+    expect((await pinned.authenticate()).subject, equals('alice'));
+    expect((await system.authenticate()).subject, equals('alice'));
   });
 
   test('throws AuthException on HTTP error with server description', () async {

@@ -26,6 +26,7 @@ Future<void> main() async {
       clientSecret: config.keycloakClientSecret,
       username: config.localUsername,
       password: config.localPassword,
+      trustedCaBytes: trustedCaBytes,
     ),
     certificateEnrollment: EnrollmentOrchestrator(
       bootstrapGateway: BootstrapClient(
