@@ -30,6 +30,7 @@ void main() {
         clientId: config.keycloakClientId,
         username: config.localUsername,
         password: config.localPassword,
+        trustedCaBytes: trustedCaBytes,
       );
       final session = await authClient.authenticate();
       final enrollment =
