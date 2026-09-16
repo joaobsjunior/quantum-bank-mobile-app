@@ -12,6 +12,8 @@ void main() {
       expect(mainSource, isNot(contains('DemoGatewayBankingApi()')));
       expect(mainSource, contains('KeycloakAuthClient'));
       expect(mainSource, contains('BootstrapClient'));
+      expect(mainSource, contains('PqcTlsSupport'));
+      expect(mainSource, contains('pqcTransport: pqcTransport'));
     },
   );
 }

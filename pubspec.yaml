@@ -9,8 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  basic_utils: ^5.8.2
+  # ASN.1 encoding for the post-quantum CSR and PKCS#8 material.
   pointycastle: ^4.0.0
+  # Pure-Dart ML-DSA (FIPS 204) for the device identity key pair and CSR signature.
+  pqcrypto: ^0.4.1
 
 dev_dependencies:
   flutter_test:

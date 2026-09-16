@@ -2,6 +2,7 @@ import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/app/app_state.dart';
 import 'package:quantum_bank_mobile/core/config/runtime_config.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
+import 'package:quantum_bank_mobile/core/tls/pqc_tls_support.dart';
 import 'package:quantum_bank_mobile/features/auth/auth_client.dart';
 import 'package:quantum_bank_mobile/features/bootstrap/enrollment_orchestrator.dart';
 
@@ -51,10 +52,12 @@ class ThrowingEnrollment implements CertificateEnrollment {
 QuantumBankAppState stateWith({
   required Authenticator authenticator,
   required CertificateEnrollment enrollment,
+  PqcTransportStatus pqcTransport = const PqcTransportStatus.supported(),
 }) => QuantumBankAppState(
   authenticator: authenticator,
   certificateEnrollment: enrollment,
   runtimeConfig: RuntimeConfig.localDefaults(),
+  pqcTransport: pqcTransport,
 );
 
 void main() {
@@ -107,5 +110,53 @@ void main() {
 
     expect(state.certificateState, isA<CsrRejectedCertState>());
     expect(state.lastError, contains('enroll-boom'));
+  });
+
+  test('post-quantum transport is supported by default and gates protected access', () async {
+    final state = stateWith(
+      authenticator: OkAuthenticator(),
+      enrollment: ReturningEnrollment(
+        CertState.ready(
+          certificateChainBytes: const <int>[1],
+          privateKeyBytes: const <int>[2],
+          expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+          certificateProfile: 'quantum-bank-mobile-client-v1',
+          environment: 'local',
+          appInstanceId: 'app-local-001',
+          deviceId: 'device-local-001',
+        ),
+      ),
+    );
+
+    expect(state.pqcTransportSupported, isTrue);
+    await state.authenticate();
+    await state.markCertificateReady();
+    expect(state.protectedReady, isTrue);
+  });
+
+  test('an unsupported post-quantum transport keeps protected access closed', () async {
+    final state = stateWith(
+      authenticator: OkAuthenticator(),
+      enrollment: ReturningEnrollment(
+        CertState.ready(
+          certificateChainBytes: const <int>[1],
+          privateKeyBytes: const <int>[2],
+          expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+          certificateProfile: 'quantum-bank-mobile-client-v1',
+          environment: 'local',
+          appInstanceId: 'app-local-001',
+          deviceId: 'device-local-001',
+        ),
+      ),
+      pqcTransport: const PqcTransportStatus.unsupported('no ML-DSA in TLS stack'),
+    );
+
+    await state.authenticate();
+    await state.markCertificateReady();
+
+    expect(state.pqcTransportSupported, isFalse);
+    expect(state.pqcTransport.reason, 'no ML-DSA in TLS stack');
+    expect(state.certificateReady, isTrue);
+    expect(state.protectedReady, isFalse);
   });
 }

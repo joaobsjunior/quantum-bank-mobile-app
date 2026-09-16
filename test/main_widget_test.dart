@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quantum_bank_mobile/app/app_state.dart';
 import 'package:quantum_bank_mobile/core/api/gateway_api.dart';
 import 'package:quantum_bank_mobile/core/config/runtime_config.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
+import 'package:quantum_bank_mobile/core/tls/pqc_tls_support.dart';
 import 'package:quantum_bank_mobile/features/auth/auth_client.dart';
 import 'package:quantum_bank_mobile/features/bootstrap/enrollment_orchestrator.dart';
 import 'package:quantum_bank_mobile/features/profile/profile_screen.dart';
@@ -26,10 +28,13 @@ class _NoopEnrollment implements CertificateEnrollment {
   }) async => throw UnimplementedError();
 }
 
-QuantumBankAppState gateState() => QuantumBankAppState(
+QuantumBankAppState gateState({
+  PqcTransportStatus pqcTransport = const PqcTransportStatus.supported(),
+}) => QuantumBankAppState(
   authenticator: _NoopAuthenticator(),
   certificateEnrollment: _NoopEnrollment(),
   runtimeConfig: RuntimeConfig.localDefaults(),
+  pqcTransport: pqcTransport,
 );
 
 Future<void> pumpApp(WidgetTester tester, QuantumBankAppState state) =>
@@ -95,5 +100,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Acesso protegido'), findsOneWidget);
+  });
+
+  testWidgets('fails closed when the TLS stack has no post-quantum support', (tester) async {
+    final state = gateState(
+      pqcTransport: const PqcTransportStatus.unsupported('UNSUPPORTED_ALGORITHM'),
+    )..authenticated = true;
+
+    await pumpApp(tester, state);
+
+    expect(
+      find.text('Transporte pós-quântico (ML-DSA) indisponível neste dispositivo.'),
+      findsOneWidget,
+    );
+    expect(find.text('UNSUPPORTED_ALGORITHM'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
+    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed, isNull);
   });
 }
