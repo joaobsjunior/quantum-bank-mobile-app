@@ -1,6 +1,8 @@
 import 'dart:convert';
 
-import 'package:pointycastle/export.dart';
+import 'dart:typed_data';
+
+import 'package:quantum_bank_mobile/core/pqc/pqc_asn1.dart';
 import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
 import 'package:quantum_bank_mobile/features/bootstrap/csr_service.dart';
@@ -9,22 +11,22 @@ import 'package:quantum_bank_mobile/features/bootstrap/keypair_service.dart';
 
 class FakeKeypairService extends KeypairService {
   @override
-  AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey> generateRsaKeyPair({int bitLength = 2048}) =>
-      AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey>(
-        RSAPublicKey(BigInt.from(3233), BigInt.from(17)),
-        RSAPrivateKey(BigInt.from(3233), BigInt.from(2753), BigInt.from(61), BigInt.from(53)),
+  MlDsaKeyPair generateMlDsaKeyPair({MlDsaLevel level = MlDsaLevel.mlDsa65}) =>
+      MlDsaKeyPair(
+        level: level,
+        publicKey: Uint8List(0),
+        privateKey: Uint8List(0),
+        seed: Uint8List(32),
       );
 
   @override
-  String encodePrivateKeyPem(RSAPrivateKey privateKey) => 'FAKE-PEM';
+  String encodePrivateKeyPem(MlDsaKeyPair keyPair) => 'FAKE-PEM';
 }
 
 class FakeCsrService extends CsrService {
   @override
-  String generatePem({
-    required CsrInput input,
-    required AsymmetricKeyPair<RSAPublicKey, RSAPrivateKey> keyPair,
-  }) => 'FAKE-CSR';
+  String generatePem({required CsrInput input, required MlDsaKeyPair keyPair}) =>
+      'FAKE-CSR';
 }
 
 class FakeBootstrapGateway implements BootstrapGateway {

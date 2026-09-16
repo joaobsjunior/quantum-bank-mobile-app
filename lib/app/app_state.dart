@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/config/runtime_config.dart';
 import '../core/tls/cert_state.dart';
+import '../core/tls/pqc_tls_support.dart';
 import '../features/auth/auth_client.dart';
 import '../features/bootstrap/enrollment_orchestrator.dart';
 
@@ -10,13 +11,23 @@ class QuantumBankAppState extends ChangeNotifier {
     required Authenticator authenticator,
     required CertificateEnrollment certificateEnrollment,
     required RuntimeConfig runtimeConfig,
+    PqcTransportStatus pqcTransport = const PqcTransportStatus.supported(),
   }) : _authenticator = authenticator,
        _certificateEnrollment = certificateEnrollment,
-       _runtimeConfig = runtimeConfig;
+       _runtimeConfig = runtimeConfig,
+       pqcTransport = pqcTransport;
 
   final Authenticator _authenticator;
   final CertificateEnrollment _certificateEnrollment;
   final RuntimeConfig _runtimeConfig;
+
+  /// Whether the platform TLS stack can drive the post-quantum (ML-DSA)
+  /// transport every Quantum Bank listener requires. When it cannot, the app
+  /// fails closed: no protected screen is reachable and no classical fallback
+  /// handshake is attempted.
+  final PqcTransportStatus pqcTransport;
+
+  bool get pqcTransportSupported => pqcTransport.supported;
 
   bool authenticated = false;
   bool authenticating = false;
@@ -27,7 +38,8 @@ class QuantumBankAppState extends ChangeNotifier {
 
   bool get certificateReady => certificateState is ReadyCertState;
 
-  bool get protectedReady => authenticated && certificateReady;
+  bool get protectedReady =>
+      pqcTransportSupported && authenticated && certificateReady;
 
   Future<void> authenticate() async {
     authenticating = true;

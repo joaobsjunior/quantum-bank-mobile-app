@@ -39,7 +39,31 @@ fail-closed mTLS client setup.
 - Local config now uses `GATEWAY_BOOTSTRAP_BASE_URL=https://localhost:8080` for
   bootstrap and `GATEWAY_BASE_URL=https://localhost:8443` for protected banking.
 - `dart test` and `bash scripts/verify-gateway-only.sh` verify certificate-ready
-  behavior and gateway-only config.
+  behavior and gateway-only config; `bash scripts/verify-pqc-csr-interop.sh`
+  verifies the ML-DSA CSR with OpenSSL.
+
+## Post-Quantum Identity and Transport
+
+- **Identity is ML-DSA.** `KeypairService` generates an ML-DSA-65 key pair
+  (FIPS 204, pure Dart via `pqcrypto`), encodes the private key as PKCS#8 (seed
+  and expanded key), and `CsrService` builds a PKCS#10 request whose subject
+  key and proof-of-possession signature are ML-DSA-65 with the identity SAN
+  URIs. The CSR verifies with OpenSSL >= 3.5 and BouncyCastle:
+  `scripts/verify-pqc-csr-interop.sh` proves it and
+  `tool/emit_ml_dsa_csr.dart` produces the backend interop fixture.
+- **Trust anchor is ML-DSA-87.** `assets/local-ca/root-ca.crt` is the PKI root
+  (regenerated together with `pki/local-ca/trust/root-ca.crt`).
+- **Transport is post-quantum only and fails closed.** Every issuer and gateway
+  listener negotiates TLS 1.3 with `X25519MLKEM768` and ML-DSA signatures.
+  `dart:io` delegates TLS to the platform BoringSSL build, which in Dart 3.11
+  rejects ML-DSA keys and certificates (`UNSUPPORTED_ALGORITHM`). At startup
+  `PqcTlsSupport` probes that capability with the bundled anchor; when the stack
+  cannot load ML-DSA material the app keeps protected access closed and shows
+  the platform error instead of attempting a classical handshake. The device
+  transport therefore waits on a TLS engine with ML-DSA support (a Dart/Flutter
+  BoringSSL update or a native TLS plugin); the local runtime's `smoke-tests`
+  service (curl + OpenSSL 3.5) exercises the exact mobile role end to end in
+  the meantime.
 
 ## Phase 5 Flutter Screens
 

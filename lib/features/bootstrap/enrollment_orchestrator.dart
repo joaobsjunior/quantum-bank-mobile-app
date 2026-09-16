@@ -80,7 +80,7 @@ class EnrollmentOrchestrator implements CertificateEnrollment {
   }) async {
     try {
       final keys = _keypairService ?? KeypairService();
-      final keyPair = keys.generateRsaKeyPair();
+      final keyPair = keys.generateMlDsaKeyPair();
       final csrPem = (_csrService ?? CsrService()).generatePem(
         input: CsrInput(
           oauth2Subject: oauth2Subject,
@@ -111,9 +111,7 @@ class EnrollmentOrchestrator implements CertificateEnrollment {
 
       return CertState.ready(
         certificateChainBytes: enrollmentResult.certificateChainBytes,
-        privateKeyBytes: utf8.encode(
-          keys.encodePrivateKeyPem(keyPair.privateKey),
-        ),
+        privateKeyBytes: utf8.encode(keys.encodePrivateKeyPem(keyPair)),
         expiresAt: enrollmentResult.expiresAt,
         certificateProfile: certificateProfile,
         environment: environment,

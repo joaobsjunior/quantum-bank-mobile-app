@@ -1,36 +1,48 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:basic_utils/basic_utils.dart';
 import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/core/tls/secure_context_factory.dart';
-import 'package:quantum_bank_mobile/features/bootstrap/csr_service.dart';
-import 'package:quantum_bank_mobile/features/bootstrap/keypair_service.dart';
+import 'package:quantum_bank_mobile/core/tls/tls_material_loader.dart';
+
+class RecordingLoader implements TlsMaterialLoader {
+  List<int>? trusted;
+  List<int>? chain;
+  List<int>? key;
+
+  @override
+  final SecurityContext context = SecurityContext(withTrustedRoots: false);
+
+  @override
+  void setTrustedCertificatesBytes(List<int> certificateBytes) {
+    trusted = certificateBytes;
+  }
+
+  @override
+  void useCertificateChainBytes(List<int> chainBytes) {
+    chain = chainBytes;
+  }
+
+  @override
+  void usePrivateKeyBytes(List<int> keyBytes) {
+    key = keyBytes;
+  }
+}
 
 void main() {
-  test('builds a security context from valid mTLS material', () {
-    final keyService = KeypairService();
-    final pair = keyService.generateRsaKeyPair(bitLength: 2048);
-    final csrPem = CsrService().generatePem(
-      input: const CsrInput(
-        oauth2Subject: 'alice@quantumbank.local',
-        appInstanceId: 'app-local-001',
-        deviceId: 'device-local-001',
-        certificateProfile: 'quantum-bank-mobile-client-v1',
-        environment: 'local',
-      ),
-      keyPair: pair,
-    );
-    final certPem = X509Utils.generateSelfSignedCertificate(pair.privateKey, csrPem, 365);
-    final keyPem = keyService.encodePrivateKeyPem(pair.privateKey);
+  test('builds a security context with explicit trust and client material', () {
+    final recording = RecordingLoader();
+    final trusted = File('assets/local-ca/root-ca.crt').readAsBytesSync();
 
-    final context = SecureContextFactory().build(
-      trustedCaBytes: File('assets/local-ca/root-ca.crt').readAsBytesSync(),
-      certificateChainBytes: utf8.encode(certPem),
-      privateKeyBytes: utf8.encode(keyPem),
+    final context = SecureContextFactory(loaderFactory: () => recording).build(
+      trustedCaBytes: trusted,
+      certificateChainBytes: const <int>[4, 5, 6],
+      privateKeyBytes: const <int>[7, 8, 9],
     );
 
-    expect(context, isA<SecurityContext>());
+    expect(context, same(recording.context));
+    expect(recording.trusted, equals(trusted));
+    expect(recording.chain, equals(const <int>[4, 5, 6]));
+    expect(recording.key, equals(const <int>[7, 8, 9]));
   });
 
   test('TlsConfigurationException describes itself', () {
@@ -40,8 +52,8 @@ void main() {
     );
   });
 
-  test('factory is importable and rejects invalid certificate material', () {
-    final factory = SecureContextFactory();
+  test('platform factory fails closed on invalid certificate material', () {
+    const factory = SecureContextFactory();
 
     expect(
       () => factory.build(
@@ -49,7 +61,13 @@ void main() {
         certificateChainBytes: const <int>[4, 5, 6],
         privateKeyBytes: const <int>[7, 8, 9],
       ),
-      throwsA(isA<TlsConfigurationException>()),
+      throwsA(
+        isA<TlsConfigurationException>().having(
+          (e) => e.message,
+          'message',
+          contains('ML-DSA'),
+        ),
+      ),
     );
   });
 
@@ -60,7 +78,12 @@ void main() {
         'lib/core/tls/secure_context_factory.dart',
       ).readAsStringSync();
 
-      expect(source, contains('SecurityContext(withTrustedRoots: false)'));
+      final loader = File(
+        'lib/core/tls/tls_material_loader.dart',
+      ).readAsStringSync();
+
+      expect(loader, contains('SecurityContext(withTrustedRoots: false)'));
+      expect(loader, isNot(contains('badCertificateCallback')));
       expect(source, contains('setTrustedCertificatesBytes'));
       expect(source, contains('useCertificateChainBytes'));
       expect(source, contains('usePrivateKeyBytes'));

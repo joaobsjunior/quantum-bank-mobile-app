@@ -36,6 +36,15 @@ The mobile app treats certificate bootstrap as failed if runtime key generation
 fails or if the private key cannot be stored according to the platform policy
 available in local v1.
 
+## Post-Quantum Key Material
+
+The runtime keypair is ML-DSA-65 (FIPS 204); the private key is stored as
+PKCS#8 with seed and expanded key. The CSR's subject public key and
+proof-of-possession signature are ML-DSA-65 (pure signature over the DER
+`CertificationRequestInfo`). The PKI rejects RSA, EC, EdDSA and ML-DSA-44 keys.
+The app probes the platform TLS stack for ML-DSA support at startup and keeps
+protected access closed when it is missing.
+
 ## CSR Generation
 
 The mobile app generates a CSR from the runtime keypair.

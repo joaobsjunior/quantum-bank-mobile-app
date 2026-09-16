@@ -6,6 +6,7 @@ import 'core/api/banking_client.dart';
 import 'core/api/gateway_api.dart';
 import 'core/api/live_gateway_banking_api.dart';
 import 'core/config/runtime_config.dart';
+import 'core/tls/pqc_tls_support.dart';
 import 'features/auth/keycloak_auth_client.dart';
 import 'features/bootstrap/bootstrap_client.dart';
 import 'features/bootstrap/enrollment_orchestrator.dart';
@@ -19,7 +20,13 @@ Future<void> main() async {
   final trustedCaBytes = (await rootBundle.load(
     config.trustedCaAsset,
   )).buffer.asUint8List().toList(growable: false);
+  // Fail closed before any socket is opened: the issuer and gateways only
+  // accept post-quantum (ML-DSA + X25519MLKEM768) handshakes.
+  final pqcTransport = const PqcTlsSupport().probe(
+    mlDsaCertificateBytes: trustedCaBytes,
+  );
   final appState = QuantumBankAppState(
+    pqcTransport: pqcTransport,
     authenticator: KeycloakAuthClient(
       tokenUrl: config.keycloakTokenUrl,
       clientId: config.keycloakClientId,
@@ -127,14 +134,26 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.appState.authenticated
+                    !widget.appState.pqcTransportSupported
+                        ? 'Transporte pós-quântico (ML-DSA) indisponível neste dispositivo.'
+                        : widget.appState.authenticated
                         ? 'Certificado do dispositivo pendente.'
                         : 'Autenticação OAuth2 pendente.',
                     textAlign: TextAlign.center,
                   ),
+                  if (!widget.appState.pqcTransportSupported) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.appState.pqcTransport.reason ?? '',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: widget.appState.authenticating
+                    onPressed:
+                        widget.appState.authenticating ||
+                            !widget.appState.pqcTransportSupported
                         ? null
                         : () => widget.appState.authenticate(),
                     icon: const Icon(Icons.verified_user_outlined),
@@ -147,7 +166,8 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed:
-                        widget.appState.authenticated &&
+                        widget.appState.pqcTransportSupported &&
+                            widget.appState.authenticated &&
                             !widget.appState.enrollingCertificate
                         ? () => widget.appState.markCertificateReady()
                         : null,
