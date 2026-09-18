@@ -19,6 +19,7 @@ class RuntimeConfig {
     required this.gatewayBootstrapBaseUrl,
     required this.gatewayBaseUrl,
     required this.trustedCaAsset,
+    required this.compatTrustedCaAsset,
     required this.appInstanceId,
     required this.deviceId,
     required this.certificateProfile,
@@ -42,7 +43,13 @@ class RuntimeConfig {
   final String localPassword;
   final Uri gatewayBootstrapBaseUrl;
   final Uri gatewayBaseUrl;
+
+  /// ML-DSA-87 root of the post-quantum chain.
   final String trustedCaAsset;
+
+  /// ECDSA P-384 root of the compatibility chain (always trusted: a
+  /// dual-identity listener may serve that chain to any ECDSA-capable client).
+  final String compatTrustedCaAsset;
   final String appInstanceId;
   final String deviceId;
   final String certificateProfile;
@@ -86,6 +93,10 @@ class RuntimeConfig {
       'TRUSTED_CA_ASSET',
       defaultValue: 'assets/local-ca/root-ca.crt',
     ),
+    compatTrustedCaAsset: const String.fromEnvironment(
+      'COMPAT_TRUSTED_CA_ASSET',
+      defaultValue: 'assets/local-ca/root-ca-compat.crt',
+    ),
     appInstanceId: const String.fromEnvironment(
       'APP_INSTANCE_ID',
       defaultValue: 'app-local-001',
@@ -113,6 +124,7 @@ class RuntimeConfig {
     Uri? gatewayBootstrapBaseUrl,
     Uri? gatewayBaseUrl,
     String trustedCaAsset = 'assets/local-ca/root-ca.crt',
+    String compatTrustedCaAsset = 'assets/local-ca/root-ca-compat.crt',
     String appInstanceId = 'app-local-001',
     String deviceId = 'device-local-001',
     String certificateProfile = 'quantum-bank-mobile-client-v1',
@@ -131,6 +143,7 @@ class RuntimeConfig {
         gatewayBootstrapBaseUrl ?? Uri.parse('https://localhost:8080'),
     gatewayBaseUrl: gatewayBaseUrl ?? Uri.parse('https://localhost:8443'),
     trustedCaAsset: trustedCaAsset,
+    compatTrustedCaAsset: compatTrustedCaAsset,
     appInstanceId: appInstanceId,
     deviceId: deviceId,
     certificateProfile: certificateProfile,

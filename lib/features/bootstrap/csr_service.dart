@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:pointycastle/asn1.dart';
-import 'package:pqcrypto/pqcrypto.dart';
 
 import '../../core/pqc/pqc_asn1.dart';
 import 'keypair_service.dart';
@@ -39,9 +38,11 @@ class CsrInput {
 }
 
 /// Builds a PKCS#10 certificate signing request whose subject public key and
-/// proof-of-possession signature are both ML-DSA (pure signature over the DER
-/// `CertificationRequestInfo`, empty context), the encoding OpenSSL >= 3.5 and
-/// BouncyCastle verify and the backend's `CsrValidator` requires.
+/// proof-of-possession signature come from the same [DeviceKeyPair]: ML-DSA
+/// (pure signature over the DER `CertificationRequestInfo`, empty context) on
+/// the post-quantum chain, ECDSA P-256 with SHA-256 on the compatibility
+/// chain. Both encodings verify with OpenSSL >= 3.5 and BouncyCastle, which is
+/// what the backend's `CsrValidator` requires.
 class CsrService {
   static const Map<String, String> _attributeTypeOids = {
     'CN': '2.5.4.3',
@@ -56,17 +57,16 @@ class CsrService {
   static const int _contextSpecificConstructed0 = 0xA0;
   static const int _generalNameUri = 0x86;
 
-  String generatePem({required CsrInput input, required MlDsaKeyPair keyPair}) =>
+  String generatePem({required CsrInput input, required DeviceKeyPair keyPair}) =>
       PqcAsn1.pem(PqcAsn1.csrLabel, generateDer(input: input, keyPair: keyPair));
 
-  Uint8List generateDer({required CsrInput input, required MlDsaKeyPair keyPair}) {
+  Uint8List generateDer({required CsrInput input, required DeviceKeyPair keyPair}) {
     final info = certificationRequestInfo(input: input, keyPair: keyPair);
-    final infoDer = info.encode();
-    final signature = MlDsa.sign(keyPair.privateKey, infoDer, keyPair.level.params);
+    final signature = keyPair.sign(info.encode());
     return ASN1Sequence(
       elements: [
         info,
-        PqcAsn1.algorithmIdentifier(keyPair.level),
+        keyPair.signatureAlgorithmIdentifier(),
         ASN1BitString(stringValues: signature),
       ],
     ).encode();
@@ -75,7 +75,7 @@ class CsrService {
   /// `CertificationRequestInfo { version 0, subject, subjectPKInfo, attributes [0] }`.
   ASN1Sequence certificationRequestInfo({
     required CsrInput input,
-    required MlDsaKeyPair keyPair,
+    required DeviceKeyPair keyPair,
   }) {
     final subject = ASN1Sequence(
       elements: [
@@ -121,12 +121,7 @@ class CsrService {
       elements: [
         ASN1Integer(BigInt.zero),
         subject,
-        ASN1Sequence(
-          elements: [
-            PqcAsn1.algorithmIdentifier(keyPair.level),
-            ASN1BitString(stringValues: keyPair.publicKey),
-          ],
-        ),
+        keyPair.subjectPublicKeyInfo(),
         ASN1Set(elements: [extensionRequest], tag: _contextSpecificConstructed0),
       ],
     );

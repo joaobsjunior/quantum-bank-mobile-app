@@ -9,9 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # ASN.1 encoding for the post-quantum CSR and PKCS#8 material.
+  # ASN.1 encoding for the CSR and PKCS#8 material, plus ECDSA P-256 for the
+  # compatibility-chain identity.
   pointycastle: ^4.0.0
-  # Pure-Dart ML-DSA (FIPS 204) for the device identity key pair and CSR signature.
+  # Pure-Dart ML-DSA (FIPS 204) for the post-quantum device identity key pair
+  # and CSR signature.
   pqcrypto: ^0.4.1
 
 dev_dependencies:
@@ -23,3 +25,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/local-ca/root-ca.crt
+    - assets/local-ca/root-ca-compat.crt

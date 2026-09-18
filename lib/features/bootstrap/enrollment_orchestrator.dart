@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../core/tls/cert_state.dart';
+import '../../core/tls/pqc_tls_support.dart';
 import 'csr_service.dart';
 import 'keypair_service.dart';
 
@@ -57,18 +58,27 @@ class BootstrapProblem implements Exception {
   final String errorCode;
 }
 
+/// Runs the OTK + CSR enrollment with the device identity family that matches
+/// the platform's [TransportMode]: an ML-DSA-65 key pair on a post-quantum
+/// capable TLS stack, an ECDSA P-256 key pair otherwise. The PKI issues the
+/// certificate under the chain of the key family.
 class EnrollmentOrchestrator implements CertificateEnrollment {
   const EnrollmentOrchestrator({
     required BootstrapGateway bootstrapGateway,
+    TransportMode transportMode = TransportMode.postQuantum,
     KeypairService? keypairService,
     CsrService? csrService,
   }) : _bootstrapGateway = bootstrapGateway,
+       _transportMode = transportMode,
        _keypairService = keypairService,
        _csrService = csrService;
 
   final BootstrapGateway _bootstrapGateway;
+  final TransportMode _transportMode;
   final KeypairService? _keypairService;
   final CsrService? _csrService;
+
+  TransportMode get transportMode => _transportMode;
 
   Future<CertState> enroll({
     required String bearerToken,
@@ -80,7 +90,7 @@ class EnrollmentOrchestrator implements CertificateEnrollment {
   }) async {
     try {
       final keys = _keypairService ?? KeypairService();
-      final keyPair = keys.generateMlDsaKeyPair();
+      final keyPair = keys.generateForTransport(_transportMode);
       final csrPem = (_csrService ?? CsrService()).generatePem(
         input: CsrInput(
           oauth2Subject: oauth2Subject,

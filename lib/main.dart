@@ -17,13 +17,23 @@ import 'features/statements/statement_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final config = RuntimeConfig.fromEnvironment();
-  final trustedCaBytes = (await rootBundle.load(
+  final postQuantumRoot = (await rootBundle.load(
     config.trustedCaAsset,
   )).buffer.asUint8List().toList(growable: false);
-  // Fail closed before any socket is opened: the issuer and gateways only
-  // accept post-quantum (ML-DSA + X25519MLKEM768) handshakes.
+  final compatibilityRoot = (await rootBundle.load(
+    config.compatTrustedCaAsset,
+  )).buffer.asUint8List().toList(growable: false);
+  // Decide the transport mode before any socket is opened: the issuer and
+  // gateways serve an ML-DSA identity to ML-DSA-capable clients and the ECDSA
+  // compatibility identity to every other client; the device identity and the
+  // trust anchors follow the same split.
   final pqcTransport = const PqcTlsSupport().probe(
-    mlDsaCertificateBytes: trustedCaBytes,
+    mlDsaCertificateBytes: postQuantumRoot,
+  );
+  final trustedCaBytes = trustAnchorsFor(
+    pqcTransport.mode,
+    postQuantumRoot: postQuantumRoot,
+    compatibilityRoot: compatibilityRoot,
   );
   final appState = QuantumBankAppState(
     pqcTransport: pqcTransport,
@@ -40,6 +50,7 @@ Future<void> main() async {
         baseUrl: config.gatewayBootstrapBaseUrl,
         trustedCaBytes: trustedCaBytes,
       ),
+      transportMode: pqcTransport.mode,
     ),
     runtimeConfig: config,
   );
@@ -134,15 +145,19 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    !widget.appState.pqcTransportSupported
-                        ? 'Transporte pós-quântico (ML-DSA) indisponível neste dispositivo.'
-                        : widget.appState.authenticated
+                    widget.appState.authenticated
                         ? 'Certificado do dispositivo pendente.'
                         : 'Autenticação OAuth2 pendente.',
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.appState.transportLabel,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   if (!widget.appState.pqcTransportSupported) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       widget.appState.pqcTransport.reason ?? '',
                       textAlign: TextAlign.center,
@@ -151,9 +166,7 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   ],
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed:
-                        widget.appState.authenticating ||
-                            !widget.appState.pqcTransportSupported
+                    onPressed: widget.appState.authenticating
                         ? null
                         : () => widget.appState.authenticate(),
                     icon: const Icon(Icons.verified_user_outlined),
@@ -166,8 +179,7 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed:
-                        widget.appState.pqcTransportSupported &&
-                            widget.appState.authenticated &&
+                        widget.appState.authenticated &&
                             !widget.appState.enrollingCertificate
                         ? () => widget.appState.markCertificateReady()
                         : null,

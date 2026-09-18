@@ -34,6 +34,40 @@ void main() {
     ]);
   });
 
+  test('generates a PKCS#10 request signed and keyed with ECDSA P-256 in compatibility mode', () {
+    final keyPair = KeypairService().generateEcdsaP256KeyPair();
+    final service = CsrService();
+
+    final csrPem = service.generatePem(input: input, keyPair: keyPair);
+    final csr = ASN1Parser(PqcAsn1.derFromPem(csrPem, PqcAsn1.csrLabel)).nextObject()
+        as ASN1Sequence;
+    final info = csr.elements![0] as ASN1Sequence;
+    final signatureAlgorithm = csr.elements![1] as ASN1Sequence;
+    final signature = csr.elements![2] as ASN1BitString;
+
+    expect(
+      (signatureAlgorithm.elements![0] as ASN1ObjectIdentifier).objectIdentifierAsString,
+      PqcAsn1.ecdsaWithSha256Oid,
+    );
+    expect(signatureAlgorithm.elements!.length, 1, reason: 'ecdsa-with-SHA256 has no parameters');
+    // Proof of possession: DER Ecdsa-Sig-Value over the DER CertificationRequestInfo.
+    expect(
+      keyPair.verify(info.encode(), Uint8List.fromList(signature.stringValues!)),
+      isTrue,
+    );
+    final spki = info.elements![2] as ASN1Sequence;
+    final spkiAlgorithm = spki.elements![0] as ASN1Sequence;
+    expect(
+      (spkiAlgorithm.elements![0] as ASN1ObjectIdentifier).objectIdentifierAsString,
+      PqcAsn1.ecPublicKeyOid,
+    );
+    expect(
+      (spkiAlgorithm.elements![1] as ASN1ObjectIdentifier).objectIdentifierAsString,
+      PqcAsn1.secp256r1Oid,
+    );
+    expect((spki.elements![1] as ASN1BitString).stringValues, equals(keyPair.uncompressedPoint));
+  });
+
   test('generates a PKCS#10 request signed and keyed with ML-DSA-65', () {
     final keyPair = KeypairService().generateMlDsaKeyPair();
     final service = CsrService();

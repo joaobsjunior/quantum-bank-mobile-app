@@ -12,6 +12,7 @@ void main() {
     expect(config.appInstanceId, equals('app-local-001'));
     expect(config.deviceId, equals('device-local-001'));
     expect(config.trustedCaAsset, equals('assets/local-ca/root-ca.crt'));
+    expect(config.compatTrustedCaAsset, equals('assets/local-ca/root-ca-compat.crt'));
     expect(config.keycloakTokenUrl.toString(), contains('openid-connect/token'));
     expect(config.keycloakTokenUrl.scheme, equals('https'));
     expect(config.gatewayBootstrapBaseUrl.scheme, equals('https'));

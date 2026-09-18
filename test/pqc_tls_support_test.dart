@@ -51,7 +51,30 @@ void main() {
 
     expect(status.supported, isTrue);
     expect(status.reason, isNull);
+    expect(status.mode, TransportMode.postQuantum);
     expect(loader.loadedChain, equals(rootAnchor));
+  });
+
+  test('an unsupported stack selects the compatibility mode instead of failing closed', () {
+    final status = PqcTlsSupport(
+      loaderFactory: () => RejectingLoader(const TlsException('no ML-DSA')),
+    ).probe(mlDsaCertificateBytes: rootAnchor);
+
+    expect(status.mode, TransportMode.compatibility);
+  });
+
+  test('trust anchors follow the transport mode', () {
+    const pq = [1, 2, 3];
+    const compat = [7, 8];
+
+    expect(
+      trustAnchorsFor(TransportMode.postQuantum, postQuantumRoot: pq, compatibilityRoot: compat),
+      equals([1, 2, 3, 7, 8]),
+    );
+    expect(
+      trustAnchorsFor(TransportMode.compatibility, postQuantumRoot: pq, compatibilityRoot: compat),
+      equals([7, 8]),
+    );
   });
 
   test('reports the TLS error when the stack rejects ML-DSA material', () {
