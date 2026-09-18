@@ -102,19 +102,24 @@ void main() {
     expect(find.text('Acesso protegido'), findsOneWidget);
   });
 
-  testWidgets('fails closed when the TLS stack has no post-quantum support', (tester) async {
+  testWidgets('runs in compatibility mode when the TLS stack has no post-quantum support', (tester) async {
     final state = gateState(
       pqcTransport: const PqcTransportStatus.unsupported('UNSUPPORTED_ALGORITHM'),
     )..authenticated = true;
 
     await pumpApp(tester, state);
 
-    expect(
-      find.text('Transporte pós-quântico (ML-DSA) indisponível neste dispositivo.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('modo de compatibilidade (ECDSA P-256)'), findsOneWidget);
     expect(find.text('UNSUPPORTED_ALGORITHM'), findsOneWidget);
-    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
-    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed, isNull);
+    expect(find.text('Certificado do dispositivo pendente.'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
+    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed, isNotNull);
+  });
+
+  testWidgets('shows the post-quantum transport label when ML-DSA is available', (tester) async {
+    await pumpApp(tester, gateState());
+
+    expect(find.textContaining('Transporte pós-quântico'), findsOneWidget);
+    expect(find.text('Autenticação OAuth2 pendente.'), findsOneWidget);
   });
 }

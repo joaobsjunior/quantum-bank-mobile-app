@@ -40,30 +40,47 @@ fail-closed mTLS client setup.
   bootstrap and `GATEWAY_BASE_URL=https://localhost:8443` for protected banking.
 - `dart test` and `bash scripts/verify-gateway-only.sh` verify certificate-ready
   behavior and gateway-only config; `bash scripts/verify-pqc-csr-interop.sh`
-  verifies the ML-DSA CSR with OpenSSL.
+  verifies the ML-DSA-65 and ECDSA P-256 CSRs with OpenSSL.
 
-## Post-Quantum Identity and Transport
+## Device Identity and Transport (post-quantum first, compatibility fallback)
 
-- **Identity is ML-DSA.** `KeypairService` generates an ML-DSA-65 key pair
-  (FIPS 204, pure Dart via `pqcrypto`), encodes the private key as PKCS#8 (seed
-  and expanded key), and `CsrService` builds a PKCS#10 request whose subject
-  key and proof-of-possession signature are ML-DSA-65 with the identity SAN
-  URIs. The CSR verifies with OpenSSL >= 3.5 and BouncyCastle:
-  `scripts/verify-pqc-csr-interop.sh` proves it and
-  `tool/emit_ml_dsa_csr.dart` produces the backend interop fixture.
-- **Trust anchor is ML-DSA-87.** `assets/local-ca/root-ca.crt` is the PKI root
-  (regenerated together with `pki/local-ca/trust/root-ca.crt`).
-- **Transport is post-quantum only and fails closed.** Every issuer and gateway
-  listener negotiates TLS 1.3 with `X25519MLKEM768` and ML-DSA signatures.
-  `dart:io` delegates TLS to the platform BoringSSL build, which in Dart 3.11
-  rejects ML-DSA keys and certificates (`UNSUPPORTED_ALGORITHM`). At startup
-  `PqcTlsSupport` probes that capability with the bundled anchor; when the stack
-  cannot load ML-DSA material the app keeps protected access closed and shows
-  the platform error instead of attempting a classical handshake. The device
-  transport therefore waits on a TLS engine with ML-DSA support (a Dart/Flutter
-  BoringSSL update or a native TLS plugin); the local runtime's `smoke-tests`
-  service (curl + OpenSSL 3.5) exercises the exact mobile role end to end in
-  the meantime.
+Every issuer and gateway listener serves a dual identity: the ML-DSA-65
+certificate to clients whose TLS stack offers ML-DSA signature schemes, the
+ECDSA P-256 compatibility certificate to every other client; both prefer the
+`X25519MLKEM768` hybrid key exchange and accept `X25519`. The app follows the
+same split, decided once at startup:
+
+- **Probe.** `PqcTlsSupport` tries to load the bundled ML-DSA-87 root anchor
+  into a `SecurityContext`. Success selects `TransportMode.postQuantum`;
+  failure selects `TransportMode.compatibility`. Nothing fails closed: both
+  modes are PKI-issued, mutually authenticated transports, and the gate
+  screen shows which one is active (with the platform reason in
+  compatibility mode).
+- **Identity.** `KeypairService.generateForTransport` produces an ML-DSA-65
+  key pair (FIPS 204, pure Dart via `pqcrypto`, PKCS#8 seed-only per RFC 9881,
+  the form BoringSSL accepts) in post-quantum mode, or an ECDSA P-256 key pair
+  (`pointycastle`, PKCS#8 wrapping RFC 5915, deterministic RFC 6979
+  signatures) in compatibility mode. `CsrService` builds the PKCS#10 request
+  from either key pair (ML-DSA or `ecdsa-with-SHA256` proof of possession, same
+  subject and SAN URIs); the PKI issues it under the chain of the key family.
+  `scripts/verify-pqc-csr-interop.sh` proves both CSRs and both PKCS#8 keys
+  with OpenSSL >= 3.5, and `tool/emit_ml_dsa_csr.dart` produces the backend
+  interop fixtures.
+- **Trust anchors.** `assets/local-ca/root-ca.crt` (ML-DSA-87) and
+  `assets/local-ca/root-ca-compat.crt` (ECDSA P-384) are the PKI roots. The
+  compatibility root is always trusted (a dual-identity listener may serve
+  that chain to any ECDSA-capable client); the ML-DSA root is added in
+  post-quantum mode only, because loading it on an unsupported stack throws.
+- **Platform status.** `dart:io` delegates TLS to the platform BoringSSL
+  build. Dart 3.11 rejects ML-DSA keys and certificates
+  (`UNSUPPORTED_ALGORITHM`); Dart 3.13 parses them and verifies ML-DSA X.509
+  signatures, but its BoringSSL still does not offer ML-DSA in
+  `signature_algorithms` nor `X25519MLKEM768` in its default groups, and
+  `SecurityContext` exposes neither setting. Until a Dart/Flutter release
+  enables them, the app runs in compatibility mode on real devices (ECDSA
+  P-256 identity, ECDSA server chain, X25519), and the local runtime's
+  `smoke-tests`/`pqc-handshake-tests` services prove the post-quantum path
+  the app will take automatically once the probe succeeds.
 
 ## Phase 5 Flutter Screens
 

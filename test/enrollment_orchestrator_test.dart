@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:quantum_bank_mobile/core/pqc/pqc_asn1.dart';
+import 'package:quantum_bank_mobile/core/tls/pqc_tls_support.dart';
 import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
 import 'package:quantum_bank_mobile/features/bootstrap/csr_service.dart';
@@ -10,6 +11,14 @@ import 'package:quantum_bank_mobile/features/bootstrap/enrollment_orchestrator.d
 import 'package:quantum_bank_mobile/features/bootstrap/keypair_service.dart';
 
 class FakeKeypairService extends KeypairService {
+  final List<TransportMode> requestedModes = [];
+
+  @override
+  DeviceKeyPair generateForTransport(TransportMode mode) {
+    requestedModes.add(mode);
+    return generateMlDsaKeyPair();
+  }
+
   @override
   MlDsaKeyPair generateMlDsaKeyPair({MlDsaLevel level = MlDsaLevel.mlDsa65}) =>
       MlDsaKeyPair(
@@ -20,12 +29,12 @@ class FakeKeypairService extends KeypairService {
       );
 
   @override
-  String encodePrivateKeyPem(MlDsaKeyPair keyPair) => 'FAKE-PEM';
+  String encodePrivateKeyPem(DeviceKeyPair keyPair) => 'FAKE-PEM';
 }
 
 class FakeCsrService extends CsrService {
   @override
-  String generatePem({required CsrInput input, required MlDsaKeyPair keyPair}) =>
+  String generatePem({required CsrInput input, required DeviceKeyPair keyPair}) =>
       'FAKE-CSR';
 }
 
@@ -62,9 +71,14 @@ class FakeBootstrapGateway implements BootstrapGateway {
   );
 }
 
-EnrollmentOrchestrator orchestrator({BootstrapProblem? problem}) => EnrollmentOrchestrator(
+EnrollmentOrchestrator orchestrator({
+  BootstrapProblem? problem,
+  FakeKeypairService? keypairService,
+  TransportMode transportMode = TransportMode.postQuantum,
+}) => EnrollmentOrchestrator(
   bootstrapGateway: FakeBootstrapGateway(problem: problem),
-  keypairService: FakeKeypairService(),
+  transportMode: transportMode,
+  keypairService: keypairService ?? FakeKeypairService(),
   csrService: FakeCsrService(),
 );
 
@@ -87,6 +101,37 @@ void main() {
     expect(utf8.decode(ready.privateKeyBytes), equals('FAKE-PEM'));
     expect(ready.certificateProfile, equals('quantum-bank-mobile-client-v1'));
     expect(ready.environment, equals('local'));
+  });
+
+  test('requests the device key family of the transport mode', () async {
+    final postQuantumKeys = FakeKeypairService();
+    await enroll(orchestrator(keypairService: postQuantumKeys));
+    expect(postQuantumKeys.requestedModes, equals([TransportMode.postQuantum]));
+    expect(orchestrator().transportMode, TransportMode.postQuantum);
+
+    final compatKeys = FakeKeypairService();
+    final compat = orchestrator(
+      keypairService: compatKeys,
+      transportMode: TransportMode.compatibility,
+    );
+    await enroll(compat);
+    expect(compatKeys.requestedModes, equals([TransportMode.compatibility]));
+    expect(compat.transportMode, TransportMode.compatibility);
+  });
+
+  test('enrolls a real ECDSA P-256 identity in compatibility mode', () async {
+    final orchestrated = EnrollmentOrchestrator(
+      bootstrapGateway: FakeBootstrapGateway(),
+      transportMode: TransportMode.compatibility,
+    );
+
+    final state = await enroll(orchestrated) as ReadyCertState;
+
+    final pem = utf8.decode(state.privateKeyBytes);
+    expect(pem, startsWith('-----BEGIN PRIVATE KEY-----'));
+    final der = PqcAsn1.derFromPem(pem, PqcAsn1.pkcs8Label);
+    // id-ecPublicKey OID inside the PKCS#8 AlgorithmIdentifier.
+    expect(der, containsAllInOrder([0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01]));
   });
 
   test('maps bootstrap problems to certificate failure states', () async {

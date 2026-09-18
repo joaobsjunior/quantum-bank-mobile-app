@@ -134,7 +134,7 @@ void main() {
     expect(state.protectedReady, isTrue);
   });
 
-  test('an unsupported post-quantum transport keeps protected access closed', () async {
+  test('an unsupported post-quantum transport runs in compatibility mode', () async {
     final state = stateWith(
       authenticator: OkAuthenticator(),
       enrollment: ReturningEnrollment(
@@ -151,12 +151,27 @@ void main() {
       pqcTransport: const PqcTransportStatus.unsupported('no ML-DSA in TLS stack'),
     );
 
+    expect(state.pqcTransportSupported, isFalse);
+    expect(state.transportMode, TransportMode.compatibility);
+    expect(state.transportLabel, contains('compatibilidade'));
+    expect(state.transportLabel, contains('ECDSA P-256'));
+
     await state.authenticate();
     await state.markCertificateReady();
 
-    expect(state.pqcTransportSupported, isFalse);
-    expect(state.pqcTransport.reason, 'no ML-DSA in TLS stack');
-    expect(state.certificateReady, isTrue);
-    expect(state.protectedReady, isFalse);
+    // Compatibility is a first-class PKI-issued identity: protected access
+    // opens once authentication and enrollment complete.
+    expect(state.protectedReady, isTrue);
+  });
+
+  test('a post-quantum transport is labelled as such', () {
+    final state = stateWith(
+      authenticator: OkAuthenticator(),
+      enrollment: ReturningEnrollment(CertState.missing()),
+    );
+
+    expect(state.transportMode, TransportMode.postQuantum);
+    expect(state.transportLabel, contains('ML-DSA-65'));
+    expect(state.transportLabel, contains('X25519MLKEM768'));
   });
 }

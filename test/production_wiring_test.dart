@@ -14,6 +14,9 @@ void main() {
       expect(mainSource, contains('BootstrapClient'));
       expect(mainSource, contains('PqcTlsSupport'));
       expect(mainSource, contains('pqcTransport: pqcTransport'));
+      expect(mainSource, contains('transportMode: pqcTransport.mode'));
+      expect(mainSource, contains('trustAnchorsFor('));
+      expect(mainSource, contains('config.compatTrustedCaAsset'));
     },
   );
 }

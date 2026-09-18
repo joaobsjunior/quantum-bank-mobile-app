@@ -22,12 +22,25 @@ class QuantumBankAppState extends ChangeNotifier {
   final RuntimeConfig _runtimeConfig;
 
   /// Whether the platform TLS stack can drive the post-quantum (ML-DSA)
-  /// transport every Quantum Bank listener requires. When it cannot, the app
-  /// fails closed: no protected screen is reachable and no classical fallback
-  /// handshake is attempted.
+  /// transport. When it can, the device enrolls an ML-DSA-65 identity and
+  /// verifies the listeners' ML-DSA certificates; when it cannot, the device
+  /// runs in compatibility mode with an ECDSA P-256 identity under the PKI's
+  /// compatibility chain. Both are PKI-issued, mutually authenticated
+  /// transports; the mode is shown to the user, never hidden.
   final PqcTransportStatus pqcTransport;
 
   bool get pqcTransportSupported => pqcTransport.supported;
+
+  TransportMode get transportMode => pqcTransport.mode;
+
+  /// User-facing description of the negotiated transport class.
+  String get transportLabel => switch (transportMode) {
+    TransportMode.postQuantum =>
+      'Transporte pós-quântico (ML-DSA-65 + X25519MLKEM768).',
+    TransportMode.compatibility =>
+      'Transporte em modo de compatibilidade (ECDSA P-256): '
+          'ML-DSA indisponível na pilha TLS deste dispositivo.',
+  };
 
   bool authenticated = false;
   bool authenticating = false;
@@ -38,8 +51,7 @@ class QuantumBankAppState extends ChangeNotifier {
 
   bool get certificateReady => certificateState is ReadyCertState;
 
-  bool get protectedReady =>
-      pqcTransportSupported && authenticated && certificateReady;
+  bool get protectedReady => authenticated && certificateReady;
 
   Future<void> authenticate() async {
     authenticating = true;

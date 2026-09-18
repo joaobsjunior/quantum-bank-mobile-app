@@ -24,45 +24,127 @@ enum MlDsaLevel {
   };
 }
 
-/// ASN.1 / PEM helpers for ML-DSA material. ML-DSA algorithm identifiers carry
-/// no parameters (the OID alone selects the parameter set).
+/// ASN.1 / PEM helpers for the two device key families: ML-DSA (algorithm
+/// identifiers carry no parameters, the OID alone selects the parameter set)
+/// and ECDSA P-256 for the compatibility chain (RFC 5480 / RFC 5915).
 abstract final class PqcAsn1 {
   static const String pkcs8Label = 'PRIVATE KEY';
   static const String csrLabel = 'CERTIFICATE REQUEST';
+
+  /// `id-ecPublicKey` (RFC 5480).
+  static const String ecPublicKeyOid = '1.2.840.10045.2.1';
+
+  /// `secp256r1` / P-256 named curve, the only classical curve the PKI issues.
+  static const String secp256r1Oid = '1.2.840.10045.3.1.7';
+
+  /// `ecdsa-with-SHA256` (RFC 5758).
+  static const String ecdsaWithSha256Oid = '1.2.840.10045.4.3.2';
+
+  /// Canonical family name of the P-256 identity, shared with the PKI scripts.
+  static const String ecdsaP256AlgorithmName = 'ECDSA-P256';
+
+  static const int _contextSpecificPrimitive0 = 0x80;
+  static const int _contextSpecificConstructed0 = 0xA0;
+  static const int _contextSpecificConstructed1 = 0xA1;
 
   static ASN1Sequence algorithmIdentifier(MlDsaLevel level) => ASN1Sequence(
     elements: [ASN1ObjectIdentifier.fromIdentifierString(level.oid)],
   );
 
   /// `SubjectPublicKeyInfo { algorithm id-ml-dsa-*, subjectPublicKey BIT STRING }`.
-  static Uint8List subjectPublicKeyInfo(MlDsaLevel level, Uint8List publicKey) =>
-      ASN1Sequence(
-        elements: [
-          algorithmIdentifier(level),
-          ASN1BitString(stringValues: publicKey),
-        ],
-      ).encode();
+  static ASN1Sequence subjectPublicKeyInfoAsn1(
+    MlDsaLevel level,
+    Uint8List publicKey,
+  ) => ASN1Sequence(
+    elements: [
+      algorithmIdentifier(level),
+      ASN1BitString(stringValues: publicKey),
+    ],
+  );
 
-  /// PKCS#8 `PrivateKeyInfo` with the `both` choice of `ML-DSA-PrivateKey`
-  /// (seed and expanded key), the form OpenSSL >= 3.5 and BouncyCastle accept.
-  static Uint8List privateKeyInfo(
-    MlDsaLevel level, {
-    required Uint8List seed,
-    required Uint8List expandedKey,
-  }) {
-    final both = ASN1Sequence(
-      elements: [
-        ASN1OctetString(octets: seed),
-        ASN1OctetString(octets: expandedKey),
-      ],
+  /// PKCS#8 `PrivateKeyInfo` with the `seed [0] OCTET STRING` choice of
+  /// `ML-DSA-PrivateKey` (RFC 9881). This is the only representation
+  /// BoringSSL parses; OpenSSL >= 3.5 and BouncyCastle accept it and expand
+  /// the key from the seed, so it is also the most interoperable one.
+  static Uint8List privateKeyInfo(MlDsaLevel level, {required Uint8List seed}) {
+    final seedChoice = ASN1OctetString(
+      octets: seed,
+      tag: _contextSpecificPrimitive0,
     );
     return ASN1Sequence(
       elements: [
         ASN1Integer(BigInt.zero),
         algorithmIdentifier(level),
-        ASN1OctetString(octets: both.encode()),
+        ASN1OctetString(octets: seedChoice.encode()),
       ],
     ).encode();
+  }
+
+  /// `AlgorithmIdentifier { id-ecPublicKey, secp256r1 }`.
+  static ASN1Sequence ecAlgorithmIdentifier() => ASN1Sequence(
+    elements: [
+      ASN1ObjectIdentifier.fromIdentifierString(ecPublicKeyOid),
+      ASN1ObjectIdentifier.fromIdentifierString(secp256r1Oid),
+    ],
+  );
+
+  /// `AlgorithmIdentifier { ecdsa-with-SHA256 }` (parameters absent).
+  static ASN1Sequence ecdsaWithSha256AlgorithmIdentifier() => ASN1Sequence(
+    elements: [ASN1ObjectIdentifier.fromIdentifierString(ecdsaWithSha256Oid)],
+  );
+
+  /// `SubjectPublicKeyInfo` for an uncompressed P-256 point (`04 || X || Y`).
+  static ASN1Sequence ecSubjectPublicKeyInfoAsn1(Uint8List uncompressedPoint) =>
+      ASN1Sequence(
+        elements: [
+          ecAlgorithmIdentifier(),
+          ASN1BitString(stringValues: uncompressedPoint),
+        ],
+      );
+
+  /// PKCS#8 `PrivateKeyInfo` wrapping an RFC 5915 `ECPrivateKey { version 1,
+  /// privateKey, parameters [0] secp256r1, publicKey [1] BIT STRING }`, the
+  /// form every TLS stack (BoringSSL, OpenSSL, BouncyCastle) loads.
+  static Uint8List ecPrivateKeyInfo({
+    required Uint8List scalar,
+    required Uint8List uncompressedPoint,
+  }) {
+    final ecPrivateKey = ASN1Sequence(
+      elements: [
+        ASN1Integer(BigInt.one),
+        ASN1OctetString(octets: scalar),
+        ASN1Sequence(
+          elements: [ASN1ObjectIdentifier.fromIdentifierString(secp256r1Oid)],
+          tag: _contextSpecificConstructed0,
+        ),
+        ASN1Sequence(
+          elements: [ASN1BitString(stringValues: uncompressedPoint)],
+          tag: _contextSpecificConstructed1,
+        ),
+      ],
+    );
+    return ASN1Sequence(
+      elements: [
+        ASN1Integer(BigInt.zero),
+        ecAlgorithmIdentifier(),
+        ASN1OctetString(octets: ecPrivateKey.encode()),
+      ],
+    ).encode();
+  }
+
+  /// DER `Ecdsa-Sig-Value { r INTEGER, s INTEGER }` (RFC 5480).
+  static Uint8List ecdsaSignature(BigInt r, BigInt s) =>
+      ASN1Sequence(elements: [ASN1Integer(r), ASN1Integer(s)]).encode();
+
+  /// Fixed-width big-endian encoding of a P-256 scalar.
+  static Uint8List scalarBytes(BigInt value, {int width = 32}) {
+    final bytes = Uint8List(width);
+    var remaining = value;
+    for (var i = width - 1; i >= 0; i--) {
+      bytes[i] = (remaining & BigInt.from(0xff)).toInt();
+      remaining = remaining >> 8;
+    }
+    return bytes;
   }
 
   static String pem(String label, Uint8List der) {
