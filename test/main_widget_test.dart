@@ -109,7 +109,7 @@ void main() {
 
     await pumpApp(tester, state);
 
-    expect(find.textContaining('modo de compatibilidade (ECDSA P-256)'), findsOneWidget);
+    expect(find.textContaining('modo de compatibilidade (ECDSA P-256 no TLS)'), findsOneWidget);
     expect(find.text('UNSUPPORTED_ALGORITHM'), findsOneWidget);
     expect(find.text('Certificado do dispositivo pendente.'), findsOneWidget);
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
@@ -121,5 +121,12 @@ void main() {
 
     expect(find.textContaining('Transporte pós-quântico'), findsOneWidget);
     expect(find.text('Autenticação OAuth2 pendente.'), findsOneWidget);
+  });
+
+  testWidgets('always shows that the application envelope is active', (tester) async {
+    await pumpApp(tester, gateState(pqcTransport: const PqcTransportStatus.compatibilityByPolicy()));
+
+    expect(find.textContaining('Envelope pós-quântico de aplicação ativo'), findsOneWidget);
+    expect(find.textContaining('Política de transporte'), findsOneWidget);
   });
 }

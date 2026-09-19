@@ -31,6 +31,15 @@ class PqcTransportStatus {
 
   const PqcTransportStatus.unsupported(String this.reason) : supported = false;
 
+  /// Compatibility transport selected by the `PQC_TRANSPORT_POLICY` build
+  /// setting (the default): the post-quantum guarantees of the app edge come
+  /// from the application-layer envelope, not from the TLS stack.
+  const PqcTransportStatus.compatibilityByPolicy()
+    : supported = false,
+      reason =
+          'Política de transporte: compatibilidade (ECDSA P-256 no TLS); '
+          'o envelope pós-quântico da camada de aplicação protege o tráfego.';
+
   /// Whether ML-DSA material is usable by the platform TLS stack.
   final bool supported;
 

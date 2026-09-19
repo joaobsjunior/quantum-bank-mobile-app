@@ -1,20 +1,27 @@
 import '../../features/auth/auth_client.dart';
+import '../pqc/transaction_signer.dart';
 import '../tls/cert_state.dart';
 import 'banking_client.dart';
 import 'gateway_api.dart';
 
+/// Live banking API over the enveloped mTLS client. Pix orders are signed
+/// with the device's ML-DSA-65 signing key (feature 012) before they leave the
+/// app; the backend verifies the signature and stores it with the attempt.
 class LiveGatewayBankingApi implements GatewayBankingApi {
-  const LiveGatewayBankingApi({
+  LiveGatewayBankingApi({
     required BankingGatewayClient bankingClient,
     required AuthSession? Function() authSessionProvider,
     required CertState Function() certStateProvider,
+    PixTransactionSigner? transactionSigner,
   }) : _bankingClient = bankingClient,
        _authSessionProvider = authSessionProvider,
-       _certStateProvider = certStateProvider;
+       _certStateProvider = certStateProvider,
+       _transactionSigner = transactionSigner ?? PixTransactionSigner();
 
   final BankingGatewayClient _bankingClient;
   final AuthSession? Function() _authSessionProvider;
   final CertState Function() _certStateProvider;
+  final PixTransactionSigner _transactionSigner;
 
   @override
   Future<PixResult> submitPix({
@@ -23,18 +30,33 @@ class LiveGatewayBankingApi implements GatewayBankingApi {
     required String description,
     required PixScenario scenario,
   }) async {
-    final response = await _callGateway(
-      (session, certState) => _bankingClient.createPixTransfer(
+    final response = await _callGateway((session, certState) {
+      final signingKey = certState.signingKey;
+      final deviceId = certState.deviceId;
+      if (signingKey == null || deviceId == null) {
+        throw StateError('device_signing_key_missing');
+      }
+      final scenarioName = scenario.name.toUpperCase();
+      return _bankingClient.createPixTransfer(
         bearerToken: session.accessToken,
         certState: certState,
         payload: {
           'amount': amount,
           'recipientKey': recipientKey,
           'description': description,
-          'scenario': scenario.name.toUpperCase(),
+          'scenario': scenarioName,
+          'signature': _transactionSigner.sign(
+            key: signingKey,
+            subject: session.subject,
+            deviceId: deviceId,
+            amount: amount,
+            recipientKey: recipientKey,
+            description: description,
+            scenario: scenarioName,
+          ),
         },
-      ),
-    );
+      );
+    });
 
     return PixResult(
       transactionId: response['transactionId'] as String,

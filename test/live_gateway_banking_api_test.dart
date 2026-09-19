@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quantum_bank_mobile/core/api/banking_client.dart';
+import 'package:quantum_bank_mobile/core/pqc/transaction_signer.dart';
 import 'package:quantum_bank_mobile/core/api/gateway_api.dart';
 import 'package:quantum_bank_mobile/core/api/live_gateway_banking_api.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
@@ -26,6 +30,27 @@ void main() {
       expect(client.lastBearerToken, equals('access-token'));
       expect(client.lastCertState, same(readyCert));
       expect(client.lastPixPayload, containsPair('scenario', 'SUCCESS'));
+      final signature = Map<String, dynamic>.from(client.lastPixPayload!['signature'] as Map);
+      expect(signature['alg'], equals('ML-DSA-65'));
+      expect(signature['deviceId'], equals('device-local-001'));
+      final message = PixTransactionSigner.canonicalMessage(
+        subject: '00000000-0000-0000-0000-000000000001',
+        deviceId: 'device-local-001',
+        amount: 25.3,
+        recipientKey: 'recipient@example.com',
+        description: 'Test pix',
+        scenario: 'SUCCESS',
+        nonce: signature['nonce'] as String,
+        issuedAt: signature['issuedAt'] as String,
+      );
+      expect(
+        readyCert.signingKey!.verify(
+          message,
+          base64.decode(signature['value'] as String),
+          context: PixTransactionSigner.context,
+        ),
+        isTrue,
+      );
       expect(result.transactionId, equals('pix-001'));
       expect(result.status, equals('COMPLETED'));
       expect(result.correlationId, equals('corr-001'));
@@ -116,6 +141,7 @@ final readyCert = CertState.ready(
   environment: 'local',
   appInstanceId: 'app-local-001',
   deviceId: 'device-local-001',
+  signingKey: DeviceSigningKey.fromSeed(Uint8List.fromList(List<int>.filled(32, 4))),
 );
 
 class RecordingBankingGatewayClient implements BankingGatewayClient {

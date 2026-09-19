@@ -58,7 +58,11 @@ class CsrService {
   static const int _generalNameUri = 0x86;
 
   String generatePem({required CsrInput input, required DeviceKeyPair keyPair}) =>
-      PqcAsn1.pem(PqcAsn1.csrLabel, generateDer(input: input, keyPair: keyPair));
+      pemFromDer(generateDer(input: input, keyPair: keyPair));
+
+  /// PEM form of an already generated DER request (the same DER the signing
+  /// key's proof of possession covers).
+  String pemFromDer(Uint8List csrDer) => PqcAsn1.pem(PqcAsn1.csrLabel, csrDer);
 
   Uint8List generateDer({required CsrInput input, required DeviceKeyPair keyPair}) {
     final info = certificationRequestInfo(input: input, keyPair: keyPair);
