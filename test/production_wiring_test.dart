@@ -17,6 +17,12 @@ void main() {
       expect(mainSource, contains('transportMode: pqcTransport.mode'));
       expect(mainSource, contains('trustAnchorsFor('));
       expect(mainSource, contains('config.compatTrustedCaAsset'));
+      expect(mainSource, contains('config.transportPolicy'));
+      expect(mainSource, contains('TransportPolicy.probe => const PqcTlsSupport().probe('));
+      expect(mainSource, contains('PqcTransportStatus.compatibilityByPolicy()'));
+      expect(mainSource, contains('EnvelopeKeysVerifier('));
+      expect(mainSource, contains('trustAnchorPem: postQuantumRoot'));
+      expect(mainSource, contains('config.envelopeSignerCommonName'));
     },
   );
 }

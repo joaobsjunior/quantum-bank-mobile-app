@@ -58,6 +58,33 @@ void main() {
     expect(utf8.decode(result.certificateChainBytes), equals('leaf-cert\nissuing-cert'));
   });
 
+  test('submitCsr sends the signing key registration and parses the envelope keys', () async {
+    Map<String, dynamic>? received;
+    final server = await serve((request) async {
+      received = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
+      respondJson(request, 202, {
+        'certificateChain': ['leaf-cert'],
+        'expiresAt': '2026-05-22T10:00:00Z',
+        'envelopeKeys': {'keySet': {'kid': 'k'}, 'signature': 's', 'signerChain': ['c']},
+      });
+    });
+    addTearDown(() => server.close(force: true));
+
+    final result = await clientFor(server).submitCsr(
+      bearerToken: 'token',
+      otk: 'otk-123',
+      csrPem: 'csr',
+      appInstanceId: 'app-local-001',
+      deviceId: 'device-local-001',
+      certificateProfile: 'quantum-bank-mobile-client-v1',
+      environment: 'local',
+      signingKey: {'alg': 'ML-DSA-65', 'publicKey': 'pk', 'proof': 'pr'},
+    );
+
+    expect(received!['signingKey'], equals({'alg': 'ML-DSA-65', 'publicKey': 'pk', 'proof': 'pr'}));
+    expect(result.envelopeKeys, equals({'keySet': {'kid': 'k'}, 'signature': 's', 'signerChain': ['c']}));
+  });
+
   test('submitCsr falls back to the single certificate field', () async {
     final server = await serve(
       (request) => respondJson(request, 202, {
@@ -70,6 +97,7 @@ void main() {
     final result = await submitCsr(clientFor(server));
 
     expect(utf8.decode(result.certificateChainBytes), equals('leaf-only'));
+    expect(result.envelopeKeys, isNull);
   });
 
   test('maps an HTTP error to a BootstrapProblem with the error code', () async {

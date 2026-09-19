@@ -1,3 +1,6 @@
+import '../pqc/hybrid_envelope.dart';
+import '../pqc/transaction_signer.dart';
+
 sealed class CertState {
   const CertState(this.name);
 
@@ -10,6 +13,8 @@ sealed class CertState {
     required String environment,
     required String appInstanceId,
     required String deviceId,
+    EnvelopeKeySet? envelopeKeySet,
+    DeviceSigningKey? signingKey,
   }) = ReadyCertState;
   factory CertState.expired() = ExpiredCertState;
   factory CertState.untrusted() = UntrustedCertState;
@@ -27,7 +32,17 @@ sealed class CertState {
   String? get appInstanceId => null;
   String? get deviceId => null;
 
+  /// Verified backend envelope keys (feature 012); null until enrolled.
+  EnvelopeKeySet? get envelopeKeySet => null;
+
+  /// Device ML-DSA-65 signing key registered at enrollment; null until enrolled.
+  DeviceSigningKey? get signingKey => null;
+
   bool isReadyAt(DateTime now) => false;
+
+  /// Whether the protected surface can be called: transport identity valid,
+  /// verified envelope key set and signing key present (feature 012).
+  bool isEnvelopeReadyAt(DateTime now) => false;
 }
 
 final class MissingCertState extends CertState {
@@ -43,6 +58,8 @@ final class ReadyCertState extends CertState {
     required this.environment,
     required this.appInstanceId,
     required this.deviceId,
+    this.envelopeKeySet,
+    this.signingKey,
   }) : super('ready');
 
   @override
@@ -59,9 +76,21 @@ final class ReadyCertState extends CertState {
   final String appInstanceId;
   @override
   final String deviceId;
+  @override
+  final EnvelopeKeySet? envelopeKeySet;
+  @override
+  final DeviceSigningKey? signingKey;
 
   @override
   bool isReadyAt(DateTime now) => now.isBefore(expiresAt);
+
+  /// A banking call needs the transport identity, a valid envelope key set and
+  /// the signing key; anything less is not "ready" for the protected surface.
+  @override
+  bool isEnvelopeReadyAt(DateTime now) =>
+      isReadyAt(now) &&
+      signingKey != null &&
+      (envelopeKeySet?.isValidAt(now) ?? false);
 }
 
 final class ExpiredCertState extends CertState {

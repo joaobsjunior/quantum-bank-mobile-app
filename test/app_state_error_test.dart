@@ -155,6 +155,8 @@ void main() {
     expect(state.transportMode, TransportMode.compatibility);
     expect(state.transportLabel, contains('compatibilidade'));
     expect(state.transportLabel, contains('ECDSA P-256'));
+    expect(state.envelopeLabel, contains('ML-KEM-768 + X25519'));
+    expect(state.envelopeLabel, contains('ML-DSA-65'));
 
     await state.authenticate();
     await state.markCertificateReady();

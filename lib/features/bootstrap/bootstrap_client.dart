@@ -55,6 +55,7 @@ class BootstrapClient implements BootstrapGateway {
     required String deviceId,
     required String certificateProfile,
     required String environment,
+    Map<String, Object?>? signingKey,
   }) async {
     final response = await _postJson(
       '/auth/csr',
@@ -66,6 +67,7 @@ class BootstrapClient implements BootstrapGateway {
         'deviceId': deviceId,
         'certificateProfile': certificateProfile,
         'environment': environment,
+        if (signingKey != null) 'signingKey': signingKey,
       },
     );
 
@@ -74,9 +76,13 @@ class BootstrapClient implements BootstrapGateway {
                 <dynamic>[response['certificate'] as String])
             .cast<String>();
 
+    final envelopeKeys = response['envelopeKeys'];
     return CertificateEnrollmentResult(
       certificateChainBytes: utf8.encode(chain.join('\n')),
       expiresAt: DateTime.parse(response['expiresAt'] as String),
+      envelopeKeys: envelopeKeys is Map
+          ? Map<String, dynamic>.from(envelopeKeys)
+          : null,
     );
   }
 

@@ -18,6 +18,20 @@ void main() {
     expect(config.gatewayBootstrapBaseUrl.scheme, equals('https'));
     expect(config.gatewayBaseUrl.scheme, equals('https'));
     expect(config.localPassword, isEmpty);
+    expect(config.transportPolicy, TransportPolicy.compatibility);
+    expect(config.envelopeSignerCommonName, equals('backend'));
+  });
+
+  test('transport policy parses the build setting and rejects unknown values', () {
+    expect(TransportPolicy.parse(''), TransportPolicy.compatibility);
+    expect(TransportPolicy.parse('compatibility'), TransportPolicy.compatibility);
+    expect(TransportPolicy.parse('probe'), TransportPolicy.probe);
+    expect(() => TransportPolicy.parse('auto'), throwsA(isA<InsecureRuntimeConfigException>()));
+    expect(
+      RuntimeConfig.localDefaults(transportPolicy: TransportPolicy.probe, envelopeSignerCommonName: 'api')
+          .envelopeSignerCommonName,
+      equals('api'),
+    );
   });
 
   test('rejects plaintext origins for the issuer and the gateway', () {

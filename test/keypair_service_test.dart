@@ -153,6 +153,20 @@ void main() {
     expect(publicKey.stringValues, equals(pair.publicKey));
   });
 
+  test('encodes ML-KEM-768 and X25519 keys in the PKCS#8 and SPKI forms OpenSSL reads', () {
+    final mlkem = PqcAsn1.mlKemPrivateKeyInfo(Uint8List(64));
+    // id-alg-ml-kem-768 OID and the [0] seed choice of 64 bytes.
+    expect(mlkem, containsAllInOrder([0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x04, 0x02]));
+    expect(mlkem, containsAllInOrder([0x04, 0x42, 0x80, 0x40]));
+
+    final x25519 = PqcAsn1.x25519PrivateKeyInfo(Uint8List(32));
+    expect(x25519, containsAllInOrder([0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20]));
+
+    final spki = PqcAsn1.x25519SubjectPublicKeyInfo(Uint8List.fromList(List<int>.filled(32, 0xab)));
+    expect(spki.sublist(0, 12), equals([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x03, 0x21, 0x00]));
+    expect(spki.length, equals(44));
+  });
+
   test('PEM helpers round-trip arbitrary DER', () {
     final der = Uint8List.fromList(List<int>.generate(100, (i) => i));
 
