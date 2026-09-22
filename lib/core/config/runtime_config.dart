@@ -9,6 +9,27 @@ class InsecureRuntimeConfigException implements Exception {
   String toString() => 'InsecureRuntimeConfigException: $message';
 }
 
+/// How the device transport mode is chosen (feature 012, story 5).
+enum TransportPolicy {
+  /// ECDSA P-256 transport identity under the compatibility chain; the
+  /// post-quantum protection of the app edge is the application envelope.
+  compatibility,
+
+  /// Feature 011 behaviour: probe whether `dart:io` loads ML-DSA material and
+  /// enroll an ML-DSA-65 transport identity when it does. Opt-in, because a
+  /// stack that loads ML-DSA certificates but cannot sign the handshake would
+  /// otherwise lock the device out.
+  probe;
+
+  static TransportPolicy parse(String value) => switch (value) {
+    'probe' => TransportPolicy.probe,
+    'compatibility' || '' => TransportPolicy.compatibility,
+    _ => throw InsecureRuntimeConfigException(
+      'PQC_TRANSPORT_POLICY must be compatibility or probe, got $value',
+    ),
+  };
+}
+
 class RuntimeConfig {
   RuntimeConfig({
     required this.keycloakTokenUrl,
@@ -24,6 +45,8 @@ class RuntimeConfig {
     required this.deviceId,
     required this.certificateProfile,
     required this.environment,
+    this.transportPolicy = TransportPolicy.compatibility,
+    this.envelopeSignerCommonName = 'backend',
   }) {
     // Fail closed: credentials, tokens and certificates only ever travel over
     // TLS verified against the bundled trust anchor.
@@ -54,6 +77,12 @@ class RuntimeConfig {
   final String deviceId;
   final String certificateProfile;
   final String environment;
+
+  /// Transport mode selection (`PQC_TRANSPORT_POLICY`).
+  final TransportPolicy transportPolicy;
+
+  /// CN of the PKI-issued identity that signs the envelope key set.
+  final String envelopeSignerCommonName;
 
   factory RuntimeConfig.fromEnvironment() => RuntimeConfig.localDefaults(
     keycloakTokenUrl: Uri.parse(
@@ -113,6 +142,13 @@ class RuntimeConfig {
       'QUANTUM_BANK_ENVIRONMENT',
       defaultValue: 'local',
     ),
+    transportPolicy: TransportPolicy.parse(
+      const String.fromEnvironment('PQC_TRANSPORT_POLICY', defaultValue: 'compatibility'),
+    ),
+    envelopeSignerCommonName: const String.fromEnvironment(
+      'ENVELOPE_SIGNER_CN',
+      defaultValue: 'backend',
+    ),
   );
 
   factory RuntimeConfig.localDefaults({
@@ -129,6 +165,8 @@ class RuntimeConfig {
     String deviceId = 'device-local-001',
     String certificateProfile = 'quantum-bank-mobile-client-v1',
     String environment = 'local',
+    TransportPolicy transportPolicy = TransportPolicy.compatibility,
+    String envelopeSignerCommonName = 'backend',
   }) => RuntimeConfig(
     keycloakTokenUrl:
         keycloakTokenUrl ??
@@ -148,5 +186,7 @@ class RuntimeConfig {
     deviceId: deviceId,
     certificateProfile: certificateProfile,
     environment: environment,
+    transportPolicy: transportPolicy,
+    envelopeSignerCommonName: envelopeSignerCommonName,
   );
 }

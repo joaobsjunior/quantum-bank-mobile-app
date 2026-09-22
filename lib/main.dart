@@ -6,6 +6,7 @@ import 'core/api/banking_client.dart';
 import 'core/api/gateway_api.dart';
 import 'core/api/live_gateway_banking_api.dart';
 import 'core/config/runtime_config.dart';
+import 'core/pqc/envelope_keys_verifier.dart';
 import 'core/tls/pqc_tls_support.dart';
 import 'features/auth/keycloak_auth_client.dart';
 import 'features/bootstrap/bootstrap_client.dart';
@@ -23,13 +24,19 @@ Future<void> main() async {
   final compatibilityRoot = (await rootBundle.load(
     config.compatTrustedCaAsset,
   )).buffer.asUint8List().toList(growable: false);
-  // Decide the transport mode before any socket is opened: the issuer and
-  // gateways serve an ML-DSA identity to ML-DSA-capable clients and the ECDSA
-  // compatibility identity to every other client; the device identity and the
-  // trust anchors follow the same split.
-  final pqcTransport = const PqcTlsSupport().probe(
-    mlDsaCertificateBytes: postQuantumRoot,
-  );
+  // Decide the transport mode before any socket is opened. The default policy
+  // is the compatibility transport (ECDSA P-256 identity), because no current
+  // Dart release can present an ML-DSA identity in the TLS handshake; the
+  // post-quantum protection of the app edge is the application envelope and
+  // the ML-DSA-65 transaction signatures, which do not depend on the TLS
+  // stack. `PQC_TRANSPORT_POLICY=probe` restores the feature 011 probe.
+  final pqcTransport = switch (config.transportPolicy) {
+    TransportPolicy.probe => const PqcTlsSupport().probe(
+      mlDsaCertificateBytes: postQuantumRoot,
+    ),
+    TransportPolicy.compatibility =>
+      const PqcTransportStatus.compatibilityByPolicy(),
+  };
   final trustedCaBytes = trustAnchorsFor(
     pqcTransport.mode,
     postQuantumRoot: postQuantumRoot,
@@ -51,6 +58,12 @@ Future<void> main() async {
         trustedCaBytes: trustedCaBytes,
       ),
       transportMode: pqcTransport.mode,
+      // The envelope key set is verified in Dart against the ML-DSA-87 root
+      // in every transport mode; the compatibility TLS chain never decides it.
+      envelopeKeysVerifier: EnvelopeKeysVerifier(
+        trustAnchorPem: postQuantumRoot,
+        expectedSignerCommonName: config.envelopeSignerCommonName,
+      ),
     ),
     runtimeConfig: config,
   );
@@ -128,9 +141,10 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
       return Scaffold(
         appBar: AppBar(title: const Text('Quantum Bank')),
         body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -153,6 +167,12 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   const SizedBox(height: 8),
                   Text(
                     widget.appState.transportLabel,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.appState.envelopeLabel,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
@@ -202,6 +222,7 @@ class _QuantumBankHomeState extends State<QuantumBankHome> {
                   ],
                 ],
               ),
+            ),
             ),
           ),
         ),

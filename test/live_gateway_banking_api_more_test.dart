@@ -2,6 +2,9 @@ import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/core/api/banking_client.dart';
 import 'package:quantum_bank_mobile/core/api/gateway_api.dart';
 import 'package:quantum_bank_mobile/core/api/live_gateway_banking_api.dart';
+import 'dart:typed_data';
+
+import 'package:quantum_bank_mobile/core/pqc/transaction_signer.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
 import 'package:quantum_bank_mobile/features/auth/auth_client.dart';
 
@@ -52,13 +55,25 @@ AuthSession validSession() => AuthSession(
   scopes: const [],
 );
 
+final signedCert = CertState.ready(
+  certificateChainBytes: const <int>[1],
+  privateKeyBytes: const <int>[2],
+  expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+  certificateProfile: 'quantum-bank-mobile-client-v1',
+  environment: 'local',
+  appInstanceId: 'app-local-001',
+  deviceId: 'device-local-001',
+  signingKey: DeviceSigningKey.fromSeed(Uint8List.fromList(List<int>.filled(32, 5))),
+);
+
 LiveGatewayBankingApi apiWith({
   required BankingGatewayClient client,
   AuthSession? Function()? session,
+  CertState Function()? certState,
 }) => LiveGatewayBankingApi(
   bankingClient: client,
   authSessionProvider: session ?? validSession,
-  certStateProvider: CertState.missing,
+  certStateProvider: certState ?? (() => signedCert),
 );
 
 Future<PixResult> pix(LiveGatewayBankingApi api) => api.submitPix(
@@ -85,6 +100,15 @@ void main() {
     final api = apiWith(client: FakeBankingClient(), session: () => expired);
 
     await expectLater(pix(api), throwsA(isA<StateError>()));
+  });
+
+  test('refuses to submit a Pix order without a registered signing key', () async {
+    final api = apiWith(client: FakeBankingClient(), certState: CertState.missing);
+
+    await expectLater(
+      pix(api),
+      throwsA(isA<StateError>().having((e) => e.message, 'message', 'device_signing_key_missing')),
+    );
   });
 
   test('parses a string amount and defaults a missing correlation id', () async {

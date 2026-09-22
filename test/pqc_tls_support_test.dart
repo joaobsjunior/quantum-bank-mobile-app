@@ -63,6 +63,16 @@ void main() {
     expect(status.mode, TransportMode.compatibility);
   });
 
+  test('the compatibility policy selects the compatibility mode with a reason', () {
+    // Non-const on purpose so the constructor body is executed, not canonicalized.
+    final status = PqcTransportStatus.compatibilityByPolicy(); // ignore: prefer_const_constructors
+
+    expect(status.supported, isFalse);
+    expect(status.mode, TransportMode.compatibility);
+    expect(status.reason, contains('Política de transporte'));
+    expect(status.reason, contains('envelope pós-quântico'));
+  });
+
   test('trust anchors follow the transport mode', () {
     const pq = [1, 2, 3];
     const compat = [7, 8];

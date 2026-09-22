@@ -2,7 +2,10 @@ import 'dart:convert';
 
 import 'dart:typed_data';
 
+import 'package:quantum_bank_mobile/core/pqc/envelope_keys_verifier.dart';
+import 'package:quantum_bank_mobile/core/pqc/hybrid_envelope.dart';
 import 'package:quantum_bank_mobile/core/pqc/pqc_asn1.dart';
+import 'package:quantum_bank_mobile/core/pqc/transaction_signer.dart';
 import 'package:quantum_bank_mobile/core/tls/pqc_tls_support.dart';
 import 'package:test/test.dart';
 import 'package:quantum_bank_mobile/core/tls/cert_state.dart';
@@ -34,14 +37,43 @@ class FakeKeypairService extends KeypairService {
 
 class FakeCsrService extends CsrService {
   @override
-  String generatePem({required CsrInput input, required DeviceKeyPair keyPair}) =>
-      'FAKE-CSR';
+  Uint8List generateDer({required CsrInput input, required DeviceKeyPair keyPair}) =>
+      Uint8List.fromList(utf8.encode('FAKE-CSR'));
 }
 
+final fakeKeySet = EnvelopeKeySet(
+  kid: 'kid-1',
+  mlkemPublicKey: Uint8List(1184),
+  x25519PublicKey: Uint8List(32),
+  notAfter: DateTime.utc(2027),
+);
+
+/// Accepts every key set that carries the marker, rejects the rest.
+class FakeEnvelopeKeysVerifier extends EnvelopeKeysVerifier {
+  FakeEnvelopeKeysVerifier()
+    : super(trustAnchorPem: const <int>[], expectedSignerCommonName: 'backend');
+
+  Map<String, dynamic>? seen;
+
+  @override
+  EnvelopeKeySet verify(Map<String, dynamic> envelopeKeys) {
+    seen = envelopeKeys;
+    if (envelopeKeys['trusted'] == true) {
+      return fakeKeySet;
+    }
+    throw const EnvelopeKeysUntrustedException('fake: untrusted');
+  }
+}
+
+final testSigningKey = DeviceSigningKey.fromSeed(Uint8List.fromList(List<int>.filled(32, 9)));
+
 class FakeBootstrapGateway implements BootstrapGateway {
-  FakeBootstrapGateway({this.problem});
+  FakeBootstrapGateway({this.problem, this.envelopeKeys = const {'trusted': true}});
 
   final BootstrapProblem? problem;
+  final Map<String, dynamic>? envelopeKeys;
+  Map<String, Object?>? signingKeyRegistration;
+  String? csrPem;
 
   @override
   Future<OtkIssueResult> issueOtk({
@@ -65,21 +97,32 @@ class FakeBootstrapGateway implements BootstrapGateway {
     required String deviceId,
     required String certificateProfile,
     required String environment,
-  }) async => CertificateEnrollmentResult(
-    certificateChainBytes: utf8.encode('leaf\nissuing'),
-    expiresAt: DateTime.utc(2026, 5, 22, 10),
-  );
+    Map<String, Object?>? signingKey,
+  }) async {
+    signingKeyRegistration = signingKey;
+    this.csrPem = csrPem;
+    return CertificateEnrollmentResult(
+      certificateChainBytes: utf8.encode('leaf\nissuing'),
+      expiresAt: DateTime.utc(2026, 5, 22, 10),
+      envelopeKeys: envelopeKeys,
+    );
+  }
 }
 
 EnrollmentOrchestrator orchestrator({
   BootstrapProblem? problem,
   FakeKeypairService? keypairService,
   TransportMode transportMode = TransportMode.postQuantum,
+  FakeBootstrapGateway? gateway,
+  EnvelopeKeysVerifier? verifier,
+  bool withVerifier = true,
 }) => EnrollmentOrchestrator(
-  bootstrapGateway: FakeBootstrapGateway(problem: problem),
+  bootstrapGateway: gateway ?? FakeBootstrapGateway(problem: problem),
   transportMode: transportMode,
   keypairService: keypairService ?? FakeKeypairService(),
   csrService: FakeCsrService(),
+  envelopeKeysVerifier: withVerifier ? (verifier ?? FakeEnvelopeKeysVerifier()) : null,
+  signingKeyFactory: () => testSigningKey,
 );
 
 Future<CertState> enroll(EnrollmentOrchestrator o) => o.enroll(
@@ -93,7 +136,9 @@ Future<CertState> enroll(EnrollmentOrchestrator o) => o.enroll(
 
 void main() {
   test('happy path returns a ready certificate state with metadata', () async {
-    final state = await enroll(orchestrator());
+    final gateway = FakeBootstrapGateway();
+    final verifier = FakeEnvelopeKeysVerifier();
+    final state = await enroll(orchestrator(gateway: gateway, verifier: verifier));
 
     expect(state, isA<ReadyCertState>());
     final ready = state as ReadyCertState;
@@ -101,6 +146,39 @@ void main() {
     expect(utf8.decode(ready.privateKeyBytes), equals('FAKE-PEM'));
     expect(ready.certificateProfile, equals('quantum-bank-mobile-client-v1'));
     expect(ready.environment, equals('local'));
+    expect(ready.envelopeKeySet, same(fakeKeySet));
+    expect(ready.signingKey, same(testSigningKey));
+    expect(verifier.seen, equals({'trusted': true}));
+    expect(gateway.csrPem, startsWith('-----BEGIN CERTIFICATE REQUEST-----'));
+  });
+
+  test('registers the ML-DSA-65 signing key with a proof over the CSR DER', () async {
+    final gateway = FakeBootstrapGateway();
+    await enroll(orchestrator(gateway: gateway));
+
+    final registration = gateway.signingKeyRegistration!;
+    expect(registration['alg'], equals('ML-DSA-65'));
+    expect(base64.decode(registration['publicKey'] as String), equals(testSigningKey.publicKey));
+    expect(
+      testSigningKey.verify(
+        Uint8List.fromList(utf8.encode('FAKE-CSR')),
+        base64.decode(registration['proof'] as String),
+        context: DeviceSigningKey.registrationContext,
+      ),
+      isTrue,
+    );
+  });
+
+  test('an untrusted, missing or unverifiable envelope key set leaves the device untrusted', () async {
+    expect(
+      await enroll(orchestrator(gateway: FakeBootstrapGateway(envelopeKeys: const {'trusted': false}))),
+      isA<UntrustedCertState>(),
+    );
+    expect(
+      await enroll(orchestrator(gateway: FakeBootstrapGateway(envelopeKeys: null))),
+      isA<UntrustedCertState>(),
+    );
+    expect(await enroll(orchestrator(withVerifier: false)), isA<UntrustedCertState>());
   });
 
   test('requests the device key family of the transport mode', () async {
@@ -123,6 +201,7 @@ void main() {
     final orchestrated = EnrollmentOrchestrator(
       bootstrapGateway: FakeBootstrapGateway(),
       transportMode: TransportMode.compatibility,
+      envelopeKeysVerifier: FakeEnvelopeKeysVerifier(),
     );
 
     final state = await enroll(orchestrated) as ReadyCertState;

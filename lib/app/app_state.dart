@@ -38,9 +38,15 @@ class QuantumBankAppState extends ChangeNotifier {
     TransportMode.postQuantum =>
       'Transporte pós-quântico (ML-DSA-65 + X25519MLKEM768).',
     TransportMode.compatibility =>
-      'Transporte em modo de compatibilidade (ECDSA P-256): '
-          'ML-DSA indisponível na pilha TLS deste dispositivo.',
+      'Transporte em modo de compatibilidade (ECDSA P-256 no TLS).',
   };
+
+  /// The application-layer protection is the same in both transport modes:
+  /// hybrid ML-KEM-768 + X25519 envelopes and ML-DSA-65 transaction
+  /// signatures (feature 012).
+  String get envelopeLabel =>
+      'Envelope pós-quântico de aplicação ativo: ML-KEM-768 + X25519, '
+      'assinatura ML-DSA-65 por transação.';
 
   bool authenticated = false;
   bool authenticating = false;

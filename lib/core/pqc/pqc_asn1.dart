@@ -43,6 +43,12 @@ abstract final class PqcAsn1 {
   /// Canonical family name of the P-256 identity, shared with the PKI scripts.
   static const String ecdsaP256AlgorithmName = 'ECDSA-P256';
 
+  /// `id-alg-ml-kem-768` (NIST CSOR arc), the envelope KEM.
+  static const String mlKem768Oid = '2.16.840.1.101.3.4.4.2';
+
+  /// `id-X25519` (RFC 8410).
+  static const String x25519Oid = '1.3.101.110';
+
   static const int _contextSpecificPrimitive0 = 0x80;
   static const int _contextSpecificConstructed0 = 0xA0;
   static const int _contextSpecificConstructed1 = 0xA1;
@@ -79,6 +85,46 @@ abstract final class PqcAsn1 {
       ],
     ).encode();
   }
+
+  /// PKCS#8 `PrivateKeyInfo` of an ML-KEM-768 decapsulation key in the
+  /// `seed [0] OCTET STRING` form (the 64-byte `d || z` of FIPS 203), the
+  /// representation OpenSSL >= 3.5 and BouncyCastle import. Used only by the
+  /// interop tooling: the app never holds a KEM private key.
+  static Uint8List mlKemPrivateKeyInfo(Uint8List seed) {
+    final seedChoice = ASN1OctetString(octets: seed, tag: _contextSpecificPrimitive0);
+    return ASN1Sequence(
+      elements: [
+        ASN1Integer(BigInt.zero),
+        ASN1Sequence(
+          elements: [ASN1ObjectIdentifier.fromIdentifierString(mlKem768Oid)],
+        ),
+        ASN1OctetString(octets: seedChoice.encode()),
+      ],
+    ).encode();
+  }
+
+  /// PKCS#8 `PrivateKeyInfo` of an X25519 private key (RFC 8410: the
+  /// `privateKey` OCTET STRING wraps a `CurvePrivateKey ::= OCTET STRING`).
+  static Uint8List x25519PrivateKeyInfo(Uint8List scalar) => ASN1Sequence(
+    elements: [
+      ASN1Integer(BigInt.zero),
+      ASN1Sequence(
+        elements: [ASN1ObjectIdentifier.fromIdentifierString(x25519Oid)],
+      ),
+      ASN1OctetString(octets: ASN1OctetString(octets: scalar).encode()),
+    ],
+  ).encode();
+
+  /// `SubjectPublicKeyInfo` of an X25519 public key (RFC 8410).
+  static Uint8List x25519SubjectPublicKeyInfo(Uint8List publicKey) =>
+      ASN1Sequence(
+        elements: [
+          ASN1Sequence(
+            elements: [ASN1ObjectIdentifier.fromIdentifierString(x25519Oid)],
+          ),
+          ASN1BitString(stringValues: publicKey),
+        ],
+      ).encode();
 
   /// `AlgorithmIdentifier { id-ecPublicKey, secp256r1 }`.
   static ASN1Sequence ecAlgorithmIdentifier() => ASN1Sequence(

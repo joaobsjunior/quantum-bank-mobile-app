@@ -28,6 +28,12 @@ void main() {
     expect(state.isReadyAt(DateTime.utc(2026, 5, 22, 13)), isFalse);
     expect(state.certificateProfile, equals('quantum-bank-mobile-client-v1'));
     expect(state.environment, equals('local'));
+    expect(state.envelopeKeySet, isNull);
+    expect(state.signingKey, isNull);
+    expect(state.isEnvelopeReadyAt(DateTime.utc(2026, 5, 22, 11)), isFalse);
+    expect(CertState.missing().envelopeKeySet, isNull);
+    expect(CertState.missing().signingKey, isNull);
+    expect(CertState.missing().isEnvelopeReadyAt(DateTime.utc(2026)), isFalse);
     expect(state.appInstanceId, equals('app-local-001'));
     expect(state.deviceId, equals('device-local-001'));
   });
